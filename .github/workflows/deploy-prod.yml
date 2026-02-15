@@ -1,0 +1,30 @@
+name: Deploy Production
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: self-hosted
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Create .env file
+        env:
+          ENV_FILE: ${{ secrets.ENV_FILE }}
+        run: printenv ENV_FILE > .env
+
+      - name: Stop previous deployment
+        run: docker compose --profile tunnel down --remove-orphans || true
+
+      - name: Build and start
+        run: docker compose --profile tunnel up -d --build --force-recreate
+
+      - name: Wait for healthy services
+        run: |
+          echo "Waiting for services to become healthy..."
+          sleep 10
+          docker compose ps
