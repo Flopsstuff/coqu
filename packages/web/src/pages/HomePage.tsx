@@ -6,7 +6,6 @@ import { useAuth } from "../AuthContext";
 export function HomePage() {
   const { user, logout } = useAuth();
   const [health, setHealth] = useState<HealthStatus | null>(null);
-  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     fetch("/health")
@@ -14,11 +13,9 @@ export function HomePage() {
       .then((data: ApiResponse<HealthStatus>) => {
         if (data.success && data.data) {
           setHealth(data.data);
-        } else {
-          setError(data.error ?? "Unknown error");
         }
       })
-      .catch(() => setError("Failed to connect to API"));
+      .catch(() => {});
   }, []);
 
   return (
@@ -34,28 +31,20 @@ export function HomePage() {
         </div>
       </header>
 
-      {error && <div className="error">{error}</div>}
+      <div className="home-content">
+      </div>
 
       {health && (
-        <div className="status-card">
-          <div className="status-row">
-            <span className="status-label">Status</span>
-            <span className={`status-value ${health.status === "ok" ? "ok" : ""}`}>
-              {health.status}
-            </span>
-          </div>
-          <div className="status-row">
-            <span className="status-label">Version</span>
-            <span className="status-value">{health.version}</span>
-          </div>
-          <div className="status-row">
-            <span className="status-label">Timestamp</span>
-            <span className="status-value">{health.timestamp}</span>
-          </div>
-        </div>
+        <footer className="home-footer">
+          <span className={`footer-status ${health.status === "ok" ? "ok" : ""}`}>
+            {health.status}
+          </span>
+          <span className="footer-separator" />
+          <span className="footer-item">v{health.version}</span>
+          <span className="footer-separator" />
+          <span className="footer-item">{health.timestamp}</span>
+        </footer>
       )}
-
-      {!health && !error && <div className="loading">Loading...</div>}
     </div>
   );
 }
