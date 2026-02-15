@@ -34,6 +34,4 @@ docker compose --profile tunnel up --build
 
 ## Documentation
 
-- [Architecture](docs/architecture.md)
-- [Development](docs/development.md)
-- [Deployment](docs/deployment.md)
+📖 [Online docs](https://flopsstuff.github.io/coqu/)
