@@ -1,4 +1,4 @@
-FROM node:20-alpine AS builder
+FROM node:22-alpine AS builder
 RUN corepack enable
 
 WORKDIR /app
@@ -20,8 +20,9 @@ COPY packages/web/ ./packages/web/
 RUN yarn workspace @coqu/shared build
 RUN cd packages/web && npx vite build
 
-# Serve with nginx
-FROM nginx:alpine AS production
+# Serve with nginx (stable + slim = minimal attack surface)
+FROM nginx:stable-alpine-slim AS production
+RUN apk upgrade --no-cache
 
 COPY --from=builder /app/packages/web/dist /usr/share/nginx/html
 COPY packages/web/nginx.conf /etc/nginx/conf.d/default.conf

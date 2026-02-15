@@ -1,4 +1,4 @@
-FROM node:20-alpine AS base
+FROM node:22-alpine AS base
 RUN corepack enable
 
 WORKDIR /app
@@ -24,7 +24,8 @@ FROM base AS builder
 RUN yarn workspace @coqu/api build
 
 # Production
-FROM node:20-alpine AS production
+FROM node:22-alpine AS production
+RUN apk upgrade --no-cache
 
 WORKDIR /app
 
