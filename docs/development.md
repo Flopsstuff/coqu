@@ -28,7 +28,7 @@ This command:
 
 Stop PostgreSQL:
 ```bash
-yarn dev:stop
+yarn db:stop
 ```
 
 ## Running individual packages
@@ -43,29 +43,91 @@ yarn dev:web
 
 ## Database
 
-PostgreSQL runs in Docker even in dev mode. Default connection string:
-```
-postgresql://coqu:coqu_secret@localhost:5432/coqu
-```
+PostgreSQL runs in Docker even in dev mode.
 
-### Prisma commands
+### Environment files
+
+There are two `.env` files relevant to the database:
+
+| File | Read by | Purpose |
+|------|---------|---------|
+| `.env` (root) | Docker Compose | Container settings: `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB`, `POSTGRES_PORT` |
+| `packages/api/.env` | Prisma CLI | `DATABASE_URL` for local dev — connects to `localhost:<POSTGRES_PORT>` |
+
+### `localhost` vs `postgres` host
+
+The database always runs in Docker. The host in `DATABASE_URL` depends on **where the connecting code runs**:
+
+| Who connects | Runs on | Host | Port |
+|---|---|---|---|
+| `yarn dev` / Prisma CLI / Studio | Host machine | `localhost` | `POSTGRES_PORT` (forwarded) |
+| API container (`yarn docker:up`) | Inside Docker | `postgres` | `5432` (internal) |
+
+- **Local dev** — the API and Prisma run on your machine, outside Docker. They reach the database through the forwarded port: `localhost:<POSTGRES_PORT>` → container's `5432`.
+- **Production** — everything runs inside Docker Compose. Containers share an internal network and find each other by service name, so the API connects to `postgres:5432` directly (no port forwarding needed).
+
+### First-time setup
+
+1. Copy the root env file and adjust values if needed:
+   ```bash
+   cp .env.example .env
+   ```
+
+2. Create `packages/api/.env` with `DATABASE_URL` built from the values you set in the root `.env`:
+   ```
+   DATABASE_URL=postgresql://<POSTGRES_USER>:<POSTGRES_PASSWORD>@localhost:<POSTGRES_PORT>/<POSTGRES_DB>
+   ```
+   For example, if your root `.env` contains:
+   ```
+   POSTGRES_USER=coqu
+   POSTGRES_PASSWORD=coqu_secret
+   POSTGRES_DB=coqu
+   POSTGRES_PORT=5432
+   ```
+   Then `packages/api/.env` should be:
+   ```
+   DATABASE_URL=postgresql://coqu:coqu_secret@localhost:5432/coqu
+   ```
+
+   > **Important:** use `localhost` (not `postgres`) — Prisma runs on the host, not inside Docker.
+
+3. Start PostgreSQL and apply migrations:
+   ```bash
+   yarn db:up
+   yarn db:migrate
+   ```
+
+### Day-to-day workflow
 
 ```bash
-# Generate Prisma Client after changing schema.prisma
-yarn db:generate
+# Start the database (if not already running)
+yarn db:up
 
-# Create and apply a migration
-yarn db:migrate
+# Edit packages/api/prisma/schema.prisma, then:
+yarn db:migrate    # creates and applies the migration (runs generate automatically)
 
-# Open Prisma Studio (visual data editor)
+# Browse/edit data in a GUI
 yarn db:studio
+
+# Stop the database
+yarn db:stop
 ```
+
+### All database commands
+
+| Command | Description |
+|---------|-------------|
+| `yarn db:up` | Start PostgreSQL container |
+| `yarn db:stop` | Stop PostgreSQL container |
+| `yarn db:migrate` | Create and apply Prisma migration |
+| `yarn db:generate` | Regenerate Prisma Client |
+| `yarn db:studio` | Open Prisma Studio (visual data editor) |
 
 ### Changing the DB schema
 
 1. Edit `packages/api/prisma/schema.prisma`
-2. `yarn db:migrate` — creates and applies the migration
-3. `yarn db:generate` — regenerates Prisma Client
+2. `yarn db:migrate` — creates and applies the migration (generate runs automatically)
+3. Add the type to `@coqu/shared` if needed on the frontend
 
 ## Project structure
 
@@ -95,7 +157,7 @@ coqu/
 
 - `3000` — Web (Vite dev server)
 - `4000` — API (Express)
-- `5432` — PostgreSQL
+- `5432` — PostgreSQL (default, configurable via `POSTGRES_PORT` in `.env`)
 
 ## Adding a new API route
 
