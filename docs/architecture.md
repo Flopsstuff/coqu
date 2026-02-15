@@ -80,6 +80,8 @@ Uses `react-router-dom` for client-side routing with four pages:
 - **HomePage** — main dashboard with query interface and API health status
 - **TokensPage** — API token management (create, list, delete)
 
+A shared `Header` component (`Header.tsx`) renders the navigation bar on all authenticated pages, including the logo/favicon, navigation links (with active-state highlighting for the current page), user name, and logout button.
+
 Auth state is managed via `AuthContext` (React context). JWT tokens are stored in `localStorage`. An `apiFetch` helper in `api.ts` automatically attaches the Bearer token to requests.
 
 In production it is built into static files and served by nginx (`stable-alpine-slim`), which also handles API proxying.

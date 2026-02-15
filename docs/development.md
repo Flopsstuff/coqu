@@ -150,6 +150,7 @@ coqu/
 │       │   ├── main.tsx
 │       │   ├── App.tsx
 │       │   ├── AuthContext.tsx
+│       │   ├── Header.tsx
 │       │   ├── api.ts
 │       │   ├── index.css
 │       │   └── pages/
@@ -157,6 +158,8 @@ coqu/
 │       │       ├── LoginPage.tsx
 │       │       ├── SetupPage.tsx
 │       │       └── TokensPage.tsx
+│       ├── public/
+│       │   └── favicon.svg
 │       ├── index.html
 │       └── vite.config.ts
 ├── docs/                    — documentation
