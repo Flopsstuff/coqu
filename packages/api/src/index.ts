@@ -13,6 +13,7 @@ import type {
   CreateTokenResponse,
   HealthStatus,
   PingResponse,
+  QueryResponse,
   User,
 } from "@coqu/shared";
 
@@ -285,6 +286,29 @@ app.get("/api/ping", requireAuth, async (req: AuthRequest, res) => {
       message: "pong",
       timestamp: new Date().toISOString(),
       userId: req.userId!,
+    },
+  };
+  res.json(response);
+});
+
+// --- Query ---
+
+app.post("/api/query", requireAuth, async (req: AuthRequest, res) => {
+  const { query } = req.body;
+  if (!query || typeof query !== "string" || query.trim().length === 0) {
+    res.status(400).json({ success: false, error: "Query is required" } satisfies ApiResponse<never>);
+    return;
+  }
+
+  const delay = 3000 + Math.random() * 2000;
+  await new Promise((resolve) => setTimeout(resolve, delay));
+
+  const response: ApiResponse<QueryResponse> = {
+    success: true,
+    data: {
+      query: query.trim(),
+      result: `Dummy result for: "${query.trim()}"`,
+      timestamp: new Date().toISOString(),
     },
   };
   res.json(response);

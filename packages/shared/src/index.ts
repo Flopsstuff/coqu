@@ -67,3 +67,14 @@ export interface PingResponse {
   timestamp: string;
   userId: string;
 }
+
+// Query
+export interface QueryRequest {
+  query: string;
+}
+
+export interface QueryResponse {
+  query: string;
+  result: string;
+  timestamp: string;
+}
