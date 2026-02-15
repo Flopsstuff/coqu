@@ -137,3 +137,16 @@ dist
 # Vite logs files
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
+
+# Prisma
+packages/api/prisma/migrations/
+
+# Build output
+packages/api/dist/
+packages/shared/dist/
+
+# Docker volumes
+postgres_data/
+
+# ignore gitpmoji directory
+.gitpmoji
