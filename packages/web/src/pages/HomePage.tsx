@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import type { ApiResponse, HealthStatus } from "@coqu/shared";
 import { useAuth } from "../AuthContext";
 
@@ -25,6 +26,7 @@ export function HomePage() {
       <header className="home-header">
         <h1>coqu</h1>
         <div className="user-info">
+          <Link to="/tokens" className="btn btn-ghost">API Tokens</Link>
           <span className="user-name">{user?.name}</span>
           <button onClick={logout} className="btn btn-ghost">
             Logout

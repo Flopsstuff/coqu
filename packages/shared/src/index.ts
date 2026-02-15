@@ -44,3 +44,26 @@ export interface AuthResponse {
   token: string;
   user: User;
 }
+
+// API Tokens
+export interface ApiToken {
+  id: string;
+  name: string;
+  createdAt: string;
+  lastUsedAt: string | null;
+}
+
+export interface CreateTokenRequest {
+  name: string;
+}
+
+export interface CreateTokenResponse {
+  token: string;
+  apiToken: ApiToken;
+}
+
+export interface PingResponse {
+  message: string;
+  timestamp: string;
+  userId: string;
+}

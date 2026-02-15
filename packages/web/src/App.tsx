@@ -3,6 +3,7 @@ import { AuthProvider, useAuth } from "./AuthContext";
 import { SetupPage } from "./pages/SetupPage";
 import { LoginPage } from "./pages/LoginPage";
 import { HomePage } from "./pages/HomePage";
+import { TokensPage } from "./pages/TokensPage";
 
 function AppRoutes() {
   const { user, needsSetup, loading } = useAuth();
@@ -26,6 +27,18 @@ function AppRoutes() {
             <Navigate to="/" replace />
           ) : (
             <LoginPage />
+          )
+        }
+      />
+      <Route
+        path="/tokens"
+        element={
+          needsSetup ? (
+            <Navigate to="/setup" replace />
+          ) : user ? (
+            <TokensPage />
+          ) : (
+            <Navigate to="/login" replace />
           )
         }
       />

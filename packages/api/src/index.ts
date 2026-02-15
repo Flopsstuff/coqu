@@ -1,3 +1,4 @@
+import crypto from "crypto";
 import express, { Request, Response, NextFunction } from "express";
 import cors from "cors";
 import helmet from "helmet";
@@ -6,9 +7,12 @@ import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import type {
   ApiResponse,
+  ApiToken,
   AuthResponse,
   AuthStatus,
+  CreateTokenResponse,
   HealthStatus,
+  PingResponse,
   User,
 } from "@coqu/shared";
 
@@ -40,26 +44,55 @@ function signToken(userId: string): string {
   return jwt.sign({ userId }, JWT_SECRET, { expiresIn: "7d" });
 }
 
+function generateToken(): string {
+  return "coqu_" + crypto.randomBytes(32).toString("hex");
+}
+
+function hashToken(raw: string): string {
+  return crypto.createHash("sha256").update(raw).digest("hex");
+}
+
 // --- Auth middleware ---
 
 interface AuthRequest extends Request {
   userId?: string;
 }
 
-function requireAuth(req: AuthRequest, res: Response, next: NextFunction) {
+async function requireAuth(req: AuthRequest, res: Response, next: NextFunction) {
   const header = req.headers.authorization;
   if (!header?.startsWith("Bearer ")) {
     res.status(401).json({ success: false, error: "Unauthorized" } satisfies ApiResponse<never>);
     return;
   }
 
+  const bearer = header.slice(7);
+
+  // Try JWT first (no DB hit)
   try {
-    const payload = jwt.verify(header.slice(7), JWT_SECRET) as { userId: string };
+    const payload = jwt.verify(bearer, JWT_SECRET) as { userId: string };
     req.userId = payload.userId;
     next();
+    return;
   } catch {
-    res.status(401).json({ success: false, error: "Unauthorized" } satisfies ApiResponse<never>);
+    // Not a valid JWT — try API token
   }
+
+  // Try API token
+  const token = await prisma.apiToken.findUnique({
+    where: { tokenHash: hashToken(bearer) },
+  });
+  if (token) {
+    req.userId = token.userId;
+    // Update lastUsedAt fire-and-forget
+    prisma.apiToken.update({
+      where: { id: token.id },
+      data: { lastUsedAt: new Date() },
+    }).catch(() => {});
+    next();
+    return;
+  }
+
+  res.status(401).json({ success: false, error: "Unauthorized" } satisfies ApiResponse<never>);
 }
 
 // --- Health check ---
@@ -183,6 +216,78 @@ app.post("/api/users", requireAuth, async (req, res) => {
   } catch {
     res.status(500).json({ success: false, error: "Failed to create user" } satisfies ApiResponse<never>);
   }
+});
+
+// --- Token routes ---
+
+function toSafeToken(t: { id: string; name: string; createdAt: Date; lastUsedAt: Date | null }): ApiToken {
+  return {
+    id: t.id,
+    name: t.name,
+    createdAt: t.createdAt.toISOString(),
+    lastUsedAt: t.lastUsedAt?.toISOString() ?? null,
+  };
+}
+
+app.get("/api/tokens", requireAuth, async (req: AuthRequest, res) => {
+  const tokens = await prisma.apiToken.findMany({
+    where: { userId: req.userId },
+    orderBy: { createdAt: "desc" },
+  });
+  const response: ApiResponse<ApiToken[]> = {
+    success: true,
+    data: tokens.map(toSafeToken),
+  };
+  res.json(response);
+});
+
+app.post("/api/tokens", requireAuth, async (req: AuthRequest, res) => {
+  const { name } = req.body;
+  if (!name || typeof name !== "string" || name.trim().length === 0) {
+    res.status(400).json({ success: false, error: "Token name is required" } satisfies ApiResponse<never>);
+    return;
+  }
+
+  const raw = generateToken();
+  const apiToken = await prisma.apiToken.create({
+    data: {
+      name: name.trim(),
+      tokenHash: hashToken(raw),
+      userId: req.userId!,
+    },
+  });
+
+  const response: ApiResponse<CreateTokenResponse> = {
+    success: true,
+    data: { token: raw, apiToken: toSafeToken(apiToken) },
+  };
+  res.status(201).json(response);
+});
+
+app.delete("/api/tokens/:id", requireAuth, async (req: AuthRequest, res) => {
+  const id = req.params.id as string;
+  const token = await prisma.apiToken.findUnique({ where: { id } });
+  if (!token || token.userId !== req.userId) {
+    res.status(404).json({ success: false, error: "Token not found" } satisfies ApiResponse<never>);
+    return;
+  }
+
+  await prisma.apiToken.delete({ where: { id: token.id } });
+  res.json({ success: true } satisfies ApiResponse<never>);
+});
+
+// --- Ping ---
+
+app.get("/api/ping", requireAuth, async (req: AuthRequest, res) => {
+  const response: ApiResponse<PingResponse> = {
+    success: true,
+    data: {
+      message: "pong",
+      timestamp: new Date().toISOString(),
+      userId: req.userId!,
+    },
+  };
+  res.json(response);
 });
 
 // --- Graceful shutdown ---
