@@ -10,6 +10,7 @@
     "dev": "yarn db:up && yarn db:generate && yarn build:shared && yarn dev:api & yarn dev:web",
     "db:up": "docker compose up -d postgres",
     "db:stop": "docker compose stop postgres",
+    "db:reset": "docker compose down -v postgres && echo 'Database volume removed'",
     "db:migrate": "yarn workspace @coqu/api prisma:migrate",
     "db:generate": "yarn workspace @coqu/api prisma:generate",
     "db:studio": "yarn workspace @coqu/api prisma:studio",

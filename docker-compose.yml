@@ -24,6 +24,7 @@ services:
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER:-coqu}:${POSTGRES_PASSWORD:-coqu_secret}@postgres:5432/${POSTGRES_DB:-coqu}
       API_PORT: 4000
+      JWT_SECRET: ${JWT_SECRET:-change-me-in-production}
     ports:
       - "4000:4000"
     depends_on:

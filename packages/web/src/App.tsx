@@ -1,35 +1,54 @@
-import { useEffect, useState } from "react";
-import type { ApiResponse, HealthStatus } from "@coqu/shared";
+import { Navigate, Route, Routes } from "react-router-dom";
+import { AuthProvider, useAuth } from "./AuthContext";
+import { SetupPage } from "./pages/SetupPage";
+import { LoginPage } from "./pages/LoginPage";
+import { HomePage } from "./pages/HomePage";
 
-export function App() {
-  const [health, setHealth] = useState<HealthStatus | null>(null);
-  const [error, setError] = useState<string | null>(null);
+function AppRoutes() {
+  const { user, needsSetup, loading } = useAuth();
 
-  useEffect(() => {
-    fetch("/health")
-      .then((res) => res.json())
-      .then((data: ApiResponse<HealthStatus>) => {
-        if (data.success && data.data) {
-          setHealth(data.data);
-        } else {
-          setError(data.error ?? "Unknown error");
-        }
-      })
-      .catch(() => setError("Failed to connect to API"));
-  }, []);
+  if (loading) {
+    return <div className="loading">Loading...</div>;
+  }
 
   return (
-    <div style={{ fontFamily: "system-ui", padding: "2rem" }}>
-      <h1>coqu</h1>
-      {error && <p style={{ color: "red" }}>Error: {error}</p>}
-      {health && (
-        <div>
-          <p>API Status: {health.status}</p>
-          <p>Version: {health.version}</p>
-          <p>Time: {health.timestamp}</p>
-        </div>
-      )}
-      {!health && !error && <p>Loading...</p>}
-    </div>
+    <Routes>
+      <Route
+        path="/setup"
+        element={needsSetup ? <SetupPage /> : <Navigate to="/" replace />}
+      />
+      <Route
+        path="/login"
+        element={
+          needsSetup ? (
+            <Navigate to="/setup" replace />
+          ) : user ? (
+            <Navigate to="/" replace />
+          ) : (
+            <LoginPage />
+          )
+        }
+      />
+      <Route
+        path="*"
+        element={
+          needsSetup ? (
+            <Navigate to="/setup" replace />
+          ) : user ? (
+            <HomePage />
+          ) : (
+            <Navigate to="/login" replace />
+          )
+        }
+      />
+    </Routes>
+  );
+}
+
+export function App() {
+  return (
+    <AuthProvider>
+      <AppRoutes />
+    </AuthProvider>
   );
 }
