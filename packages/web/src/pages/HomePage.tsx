@@ -1,11 +1,9 @@
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
 import type { ApiResponse, HealthStatus, QueryResponse } from "@coqu/shared";
-import { useAuth } from "../AuthContext";
+import { Header } from "../Header";
 import { apiFetch } from "../api";
 
 export function HomePage() {
-  const { user, logout } = useAuth();
   const [health, setHealth] = useState<HealthStatus | null>(null);
   const [query, setQuery] = useState("");
   const [loading, setLoading] = useState(false);
@@ -50,16 +48,7 @@ export function HomePage() {
 
   return (
     <div className="home">
-      <header className="home-header">
-        <h1>coqu</h1>
-        <div className="user-info">
-          <Link to="/tokens" className="btn btn-ghost">API Tokens</Link>
-          <span className="user-name">{user?.name}</span>
-          <button onClick={logout} className="btn btn-ghost">
-            Logout
-          </button>
-        </div>
-      </header>
+      <Header />
 
       <div className="home-content">
         <form className="query-form" onSubmit={handleSubmit}>

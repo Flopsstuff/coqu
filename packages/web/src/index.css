@@ -150,6 +150,12 @@ body {
   color: var(--color-text);
 }
 
+.btn-ghost-active {
+  background: var(--color-surface-hover);
+  color: var(--color-text);
+  border-color: var(--color-text-muted);
+}
+
 /* --- Home page --- */
 
 .home {
@@ -169,6 +175,7 @@ body {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  min-height: 3.5rem;
   padding-bottom: 1.5rem;
   border-bottom: 1px solid var(--color-border);
   margin-bottom: 2rem;
@@ -184,6 +191,12 @@ body {
   display: flex;
   align-items: center;
   gap: 1rem;
+}
+
+.home-header .user-info .btn {
+  padding: 0.5rem 1rem;
+  line-height: 1.25;
+  box-sizing: border-box;
 }
 
 .home-header .user-name {

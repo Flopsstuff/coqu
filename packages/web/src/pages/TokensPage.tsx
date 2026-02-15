@@ -1,11 +1,9 @@
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
 import type { ApiToken, CreateTokenResponse } from "@coqu/shared";
-import { useAuth } from "../AuthContext";
+import { Header } from "../Header";
 import { apiFetch } from "../api";
 
 export function TokensPage() {
-  const { user, logout } = useAuth();
   const [tokens, setTokens] = useState<ApiToken[]>([]);
   const [name, setName] = useState("");
   const [newToken, setNewToken] = useState<string | null>(null);
@@ -57,71 +55,63 @@ export function TokensPage() {
 
   return (
     <div className="home">
-      <header className="home-header">
-        <h1>
-          <Link to="/" className="header-link">coqu</Link>
-        </h1>
-        <div className="user-info">
-          <span className="user-name">{user?.name}</span>
-          <button onClick={logout} className="btn btn-ghost">
-            Logout
-          </button>
-        </div>
-      </header>
+      <Header />
 
-      <h2 className="page-title">API Tokens</h2>
+      <div className="home-content">
+        <h2 className="page-title">API Tokens</h2>
 
-      <form onSubmit={handleCreate} className="token-form">
-        <div className="token-form-row">
-          <input
-            type="text"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            placeholder="Token name"
-            className="token-input"
-          />
-          <button type="submit" className="btn btn-primary token-create-btn" disabled={!name.trim()}>
-            Create Token
-          </button>
-        </div>
-      </form>
-
-      {error && <div className="token-error">{error}</div>}
-
-      {newToken && (
-        <div className="token-alert">
-          <p className="token-alert-warning">
-            Copy this token now — it won't be shown again.
-          </p>
-          <div className="token-alert-value">
-            <code>{newToken}</code>
-            <button onClick={handleCopy} className="btn btn-sm btn-ghost">
-              {copied ? "Copied!" : "Copy"}
+        <form onSubmit={handleCreate} className="token-form">
+          <div className="token-form-row">
+            <input
+              type="text"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="Token name"
+              className="token-input"
+            />
+            <button type="submit" className="btn btn-primary token-create-btn" disabled={!name.trim()}>
+              Create Token
             </button>
           </div>
-        </div>
-      )}
+        </form>
 
-      <div className="token-list">
-        {tokens.map((t) => (
-          <div key={t.id} className="token-item">
-            <div className="token-item-info">
-              <span className="token-item-name">{t.name}</span>
-              <span className="token-item-meta">
-                Created {new Date(t.createdAt).toLocaleDateString()}
-                {t.lastUsedAt && (
-                  <> · Last used {new Date(t.lastUsedAt).toLocaleDateString()}</>
-                )}
-              </span>
+        {error && <div className="token-error">{error}</div>}
+
+        {newToken && (
+          <div className="token-alert">
+            <p className="token-alert-warning">
+              Copy this token now — it won't be shown again.
+            </p>
+            <div className="token-alert-value">
+              <code>{newToken}</code>
+              <button onClick={handleCopy} className="btn btn-sm btn-ghost">
+                {copied ? "Copied!" : "Copy"}
+              </button>
             </div>
-            <button onClick={() => handleDelete(t.id)} className="btn btn-sm btn-danger">
-              Delete
-            </button>
           </div>
-        ))}
-        {tokens.length === 0 && (
-          <p className="token-empty">No API tokens yet.</p>
         )}
+
+        <div className="token-list">
+          {tokens.map((t) => (
+            <div key={t.id} className="token-item">
+              <div className="token-item-info">
+                <span className="token-item-name">{t.name}</span>
+                <span className="token-item-meta">
+                  Created {new Date(t.createdAt).toLocaleDateString()}
+                  {t.lastUsedAt && (
+                    <> · Last used {new Date(t.lastUsedAt).toLocaleDateString()}</>
+                  )}
+                </span>
+              </div>
+              <button onClick={() => handleDelete(t.id)} className="btn btn-sm btn-danger">
+                Delete
+              </button>
+            </div>
+          ))}
+          {tokens.length === 0 && (
+            <p className="token-empty">No API tokens yet.</p>
+          )}
+        </div>
       </div>
     </div>
   );
