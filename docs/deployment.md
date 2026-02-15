@@ -52,13 +52,7 @@ Edit `.env` and set production values for:
 docker compose --profile tunnel up --build -d
 ```
 
-### 4. Run database migrations
-
-On first deploy (or after schema changes):
-
-```bash
-docker compose exec api npx prisma migrate deploy
-```
+Database migrations are applied automatically on every container start (via `prisma migrate deploy` in the API Dockerfile entrypoint). No manual migration step is needed.
 
 ## Useful commands
 
@@ -121,5 +115,6 @@ The workflow in `.github/workflows/docs.yml` deploys documentation to GitHub Pag
 ```bash
 git pull
 docker compose --profile tunnel up --build -d
-docker compose exec api npx prisma migrate deploy
 ```
+
+Migrations are applied automatically on container start.

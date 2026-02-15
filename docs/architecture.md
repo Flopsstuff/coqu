@@ -78,7 +78,7 @@ TypeScript project references (`composite: true` in shared) ensure correct cross
 
 PostgreSQL 16. ORM — Prisma.
 
-Schema is defined in `packages/api/prisma/schema.prisma`. Migrations are managed via Prisma Migrate.
+Schema is defined in `packages/api/prisma/schema.prisma`. Migrations are managed via Prisma Migrate and committed to the repository (`packages/api/prisma/migrations/`). In production, `prisma migrate deploy` runs automatically on container start.
 
 ## Network architecture (Docker)
 
