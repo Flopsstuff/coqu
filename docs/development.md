@@ -155,7 +155,8 @@ coqu/
 │       │   └── pages/
 │       │       ├── HomePage.tsx
 │       │       ├── LoginPage.tsx
-│       │       └── SetupPage.tsx
+│       │       ├── SetupPage.tsx
+│       │       └── TokensPage.tsx
 │       ├── index.html
 │       └── vite.config.ts
 ├── docs/                    — documentation

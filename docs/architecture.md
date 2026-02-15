@@ -26,6 +26,10 @@ Exports:
 - `LoginRequest` — login payload
 - `SetupRequest` — initial admin setup payload
 - `AuthResponse` — token + user returned on login/setup
+- `ApiToken` — API token entity (safe — no hash, no userId)
+- `CreateTokenRequest` — create-token payload (`{ name }`)
+- `CreateTokenResponse` — raw token + token metadata (token shown once)
+- `PingResponse` — ping endpoint response
 
 ### @coqu/api
 
@@ -39,7 +43,14 @@ Stack:
 - **jsonwebtoken** — JWT-based authentication
 - **bcryptjs** — password hashing
 
-Authentication uses JWT tokens (Bearer scheme). The `JWT_SECRET` environment variable is required — the server will refuse to start without it. Tokens expire after 7 days.
+Authentication supports two schemes (both via `Authorization: Bearer <token>`):
+
+1. **JWT** — issued on login/setup, expires after 7 days. Used by the web SPA.
+2. **API tokens** — personal tokens for programmatic access. Format: `coqu_` prefix + 64 hex chars. Stored as SHA-256 hashes in the database. `lastUsedAt` is updated on each use.
+
+The `JWT_SECRET` environment variable is required — the server will refuse to start without it.
+
+The `requireAuth` middleware tries JWT verification first (no DB hit); on failure it hashes the bearer value and looks up an `ApiToken` record.
 
 On first launch (no users in the database), the app enters a setup flow where the initial admin account is created via `POST /api/auth/setup`.
 
@@ -51,15 +62,20 @@ Routes:
 - `GET /api/auth/me` — get current user (requires auth)
 - `GET /api/users` — list users (requires auth)
 - `POST /api/users` — create user (requires auth)
+- `GET /api/tokens` — list current user's API tokens (requires auth)
+- `POST /api/tokens` — create a new API token, returns raw value once (requires auth)
+- `DELETE /api/tokens/:id` — delete an API token with ownership check (requires auth)
+- `GET /api/ping` — returns `{ message: "pong", timestamp, userId }` (requires auth)
 
 ### @coqu/web
 
 React SPA built with Vite. In dev mode runs on port `3000` and proxies `/api/*` requests to the API server.
 
-Uses `react-router-dom` for client-side routing with three pages:
+Uses `react-router-dom` for client-side routing with four pages:
 - **SetupPage** — shown when no admin account exists yet
 - **LoginPage** — email/password sign-in
 - **HomePage** — main dashboard (shows API health status)
+- **TokensPage** — API token management (create, list, delete)
 
 Auth state is managed via `AuthContext` (React context). JWT tokens are stored in `localStorage`. An `apiFetch` helper in `api.ts` automatically attaches the Bearer token to requests.
 
