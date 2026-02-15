@@ -19,8 +19,13 @@ Shared TypeScript types used by both API and Web. No runtime dependencies.
 
 Exports:
 - `ApiResponse<T>` — wrapper for all API responses
-- `User` — user entity interface
+- `User` — user entity interface (safe — no `passwordHash`)
+- `UserRole` — user role type (`"admin"`)
 - `HealthStatus` — health check response interface
+- `AuthStatus` — whether initial setup is needed
+- `LoginRequest` — login payload
+- `SetupRequest` — initial admin setup payload
+- `AuthResponse` — token + user returned on login/setup
 
 ### @coqu/api
 
@@ -31,17 +36,34 @@ Stack:
 - **Prisma** — PostgreSQL ORM
 - **Helmet** — security headers
 - **CORS** — cross-origin request handling
+- **jsonwebtoken** — JWT-based authentication
+- **bcryptjs** — password hashing
+
+Authentication uses JWT tokens (Bearer scheme). The `JWT_SECRET` environment variable is required — the server will refuse to start without it. Tokens expire after 7 days.
+
+On first launch (no users in the database), the app enters a setup flow where the initial admin account is created via `POST /api/auth/setup`.
 
 Routes:
 - `GET /health` — service health check
-- `GET /api/users` — list users
-- `POST /api/users` — create user
+- `GET /api/auth/status` — returns `{ needsSetup: boolean }`
+- `POST /api/auth/setup` — create initial admin account (only works when no users exist)
+- `POST /api/auth/login` — authenticate with email + password, returns JWT
+- `GET /api/auth/me` — get current user (requires auth)
+- `GET /api/users` — list users (requires auth)
+- `POST /api/users` — create user (requires auth)
 
 ### @coqu/web
 
 React SPA built with Vite. In dev mode runs on port `3000` and proxies `/api/*` requests to the API server.
 
-In production it is built into static files and served by nginx, which also handles API proxying.
+Uses `react-router-dom` for client-side routing with three pages:
+- **SetupPage** — shown when no admin account exists yet
+- **LoginPage** — email/password sign-in
+- **HomePage** — main dashboard (shows API health status)
+
+Auth state is managed via `AuthContext` (React context). JWT tokens are stored in `localStorage`. An `apiFetch` helper in `api.ts` automatically attaches the Bearer token to requests.
+
+In production it is built into static files and served by nginx (`stable-alpine-slim`), which also handles API proxying.
 
 ## Package dependencies
 
@@ -86,5 +108,6 @@ Defined in `.env` (template — `.env.example`):
 - `POSTGRES_PORT` — PostgreSQL port (default: `5432`)
 - `DATABASE_URL` — Prisma connection string
 - `API_PORT` — API server port
+- `JWT_SECRET` — secret key for signing JWT auth tokens (required, no default)
 - `VITE_API_URL` — API URL for Vite dev proxy
 - `CLOUDFLARE_TUNNEL_TOKEN` — Cloudflare Tunnel token

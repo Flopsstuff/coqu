@@ -15,8 +15,8 @@ The application runs entirely in Docker and is exposed to the internet via a Clo
 All services are defined in `docker-compose.yml`:
 
 - **postgres** — PostgreSQL 16 database with a health check
-- **api** — Express API server (multi-stage build, port 4000)
-- **web** — React SPA served by nginx (port 80 internally, 3000 externally)
+- **api** — Express API server (Node 22 Alpine, multi-stage build, port 4000)
+- **web** — React SPA served by nginx (`stable-alpine-slim`, port 80 internally, 3000 externally)
 - **cloudflared** — Cloudflare Tunnel client (enabled via `tunnel` profile)
 
 ## Step-by-step
@@ -30,6 +30,7 @@ cp .env.example .env
 Edit `.env` and set production values for:
 - `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB`
 - `DATABASE_URL` (must match the postgres credentials above)
+- `JWT_SECRET` — a strong random secret for signing auth tokens (required)
 
 ### 2. Set up Cloudflare Tunnel
 

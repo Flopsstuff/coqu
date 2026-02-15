@@ -41,4 +41,4 @@ WORKDIR /app/packages/api
 
 EXPOSE 4000
 
-CMD ["node", "dist/index.js"]
+CMD ["sh", "-c", "npx prisma migrate deploy --schema=prisma/schema.prisma && node dist/index.js"]

@@ -15,6 +15,7 @@ yarn install
 
 # Create environment file
 cp .env.example .env
+# Edit .env and set JWT_SECRET (required for the API to start)
 
 # Start everything (postgres in Docker + API + Web locally)
 yarn dev
@@ -25,6 +26,8 @@ This command:
 2. Generates Prisma Client
 3. Starts API at `http://localhost:4000`
 4. Starts Web at `http://localhost:3000`
+
+On first run, the web UI will show an **Initial Setup** page where you create the admin account.
 
 Stop PostgreSQL:
 ```bash
@@ -87,6 +90,7 @@ The database always runs in Docker. The host in `DATABASE_URL` depends on **wher
    Then `packages/api/.env` should be:
    ```
    DATABASE_URL=postgresql://coqu:coqu_secret@localhost:5432/coqu
+   JWT_SECRET=change-me-in-production
    ```
 
    > **Important:** use `localhost` (not `postgres`) — Prisma runs on the host, not inside Docker.
@@ -119,6 +123,7 @@ yarn db:stop
 |---------|-------------|
 | `yarn db:up` | Start PostgreSQL container |
 | `yarn db:stop` | Stop PostgreSQL container |
+| `yarn db:reset` | Remove PostgreSQL container and volume (destroys all data) |
 | `yarn db:migrate` | Create and apply Prisma migration |
 | `yarn db:generate` | Regenerate Prisma Client |
 | `yarn db:studio` | Open Prisma Studio (visual data editor) |
@@ -143,7 +148,14 @@ coqu/
 │   └── web/                 — React SPA
 │       ├── src/
 │       │   ├── main.tsx
-│       │   └── App.tsx
+│       │   ├── App.tsx
+│       │   ├── AuthContext.tsx
+│       │   ├── api.ts
+│       │   ├── index.css
+│       │   └── pages/
+│       │       ├── HomePage.tsx
+│       │       ├── LoginPage.tsx
+│       │       └── SetupPage.tsx
 │       ├── index.html
 │       └── vite.config.ts
 ├── docs/                    — documentation
