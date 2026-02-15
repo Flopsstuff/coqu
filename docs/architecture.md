@@ -30,6 +30,8 @@ Exports:
 - `CreateTokenRequest` — create-token payload (`{ name }`)
 - `CreateTokenResponse` — raw token + token metadata (token shown once)
 - `PingResponse` — ping endpoint response
+- `QueryRequest` — query submission payload (`{ query }`)
+- `QueryResponse` — query result (`{ query, result, timestamp }`)
 
 ### @coqu/api
 
@@ -66,6 +68,7 @@ Routes:
 - `POST /api/tokens` — create a new API token, returns raw value once (requires auth)
 - `DELETE /api/tokens/:id` — delete an API token with ownership check (requires auth)
 - `GET /api/ping` — returns `{ message: "pong", timestamp, userId }` (requires auth)
+- `POST /api/query` — submit a query, returns dummy result after 3–5 s delay (requires auth)
 
 ### @coqu/web
 
@@ -74,7 +77,7 @@ React SPA built with Vite. In dev mode runs on port `3000` and proxies `/api/*` 
 Uses `react-router-dom` for client-side routing with four pages:
 - **SetupPage** — shown when no admin account exists yet
 - **LoginPage** — email/password sign-in
-- **HomePage** — main dashboard (shows API health status)
+- **HomePage** — main dashboard with query interface and API health status
 - **TokensPage** — API token management (create, list, delete)
 
 Auth state is managed via `AuthContext` (React context). JWT tokens are stored in `localStorage`. An `apiFetch` helper in `api.ts` automatically attaches the Bearer token to requests.
