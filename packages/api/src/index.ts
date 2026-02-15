@@ -15,7 +15,10 @@ import type {
 const app = express();
 const prisma = new PrismaClient();
 const port = process.env.API_PORT || 4000;
-const JWT_SECRET = process.env.JWT_SECRET || "fallback-dev-secret";
+if (!process.env.JWT_SECRET) {
+  throw new Error("JWT_SECRET environment variable must be set");
+}
+const JWT_SECRET = process.env.JWT_SECRET;
 
 app.use(helmet());
 app.use(cors());
