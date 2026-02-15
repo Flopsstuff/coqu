@@ -21,10 +21,12 @@ jobs:
         run: docker compose --profile tunnel down --remove-orphans || true
 
       - name: Build and start
-        run: docker compose --profile tunnel up -d --build --force-recreate
+        timeout-minutes: 10
+        run: docker compose --profile tunnel up -d --build --force-recreate --wait
 
-      - name: Wait for healthy services
+      - name: Show service status
+        if: always()
         run: |
-          echo "Waiting for services to become healthy..."
-          sleep 10
-          docker compose ps
+          docker compose --profile tunnel ps -a
+          echo "--- Logs (last 30 lines per service) ---"
+          docker compose --profile tunnel logs --tail=30

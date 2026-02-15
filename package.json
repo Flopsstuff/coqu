@@ -17,8 +17,7 @@
     "db:generate": "yarn workspace @coqu/api prisma:generate",
     "db:studio": "yarn workspace @coqu/api prisma:studio",
     "docker:up": "docker compose up --build",
-    "docker:down": "docker compose down",
-    "prod": "docker compose --profile tunnel up --build -d"
+    "docker:down": "docker compose down"
   },
   "engines": {
     "node": ">=20"
