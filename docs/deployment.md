@@ -99,7 +99,23 @@ docker compose down -v
 
 **Warning:** `-v` deletes the volume and all data.
 
-## Updating
+## CI/CD
+
+### Production deployment
+
+The workflow in `.github/workflows/deploy-prod.yml` automatically deploys on every push to `main`:
+
+1. Checks out the repository on a **self-hosted runner**
+2. Creates `.env` from the `ENV_FILE` repository secret
+3. Stops the previous deployment
+4. Builds and starts all services (including Cloudflare Tunnel)
+5. Logs service status for debugging
+
+### Documentation deployment
+
+The workflow in `.github/workflows/docs.yml` deploys documentation to GitHub Pages when files in `docs/` or `mkdocs.yml` change on `main`. It can also be triggered manually via `workflow_dispatch`. The site is built with [MkDocs Material](https://squidfunk.github.io/mkdocs-material/).
+
+## Updating (manual)
 
 ```bash
 git pull

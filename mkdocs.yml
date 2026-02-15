@@ -1,8 +1,8 @@
-site_name: Flugins Documentation
-site_description: Collection of Claude Code plugins
-site_url: https://flopsstuff.github.io/flugins/
-repo_url: https://github.com/Flopsstuff/flugins
-repo_name: Flopsstuff/flugins
+site_name: coqu Documentation
+site_description: Code Query — TypeScript monorepo with a web frontend, REST API, and PostgreSQL database
+site_url: https://flopsstuff.github.io/coqu/
+repo_url: https://github.com/Flopsstuff/coqu
+repo_name: Flopsstuff/coqu
 
 theme:
   name: material

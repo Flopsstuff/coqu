@@ -83,6 +83,7 @@ Single domain, single entry point. Nginx routes traffic between static files and
 Defined in `.env` (template — `.env.example`):
 
 - `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB` — PostgreSQL credentials
+- `POSTGRES_PORT` — PostgreSQL port (default: `5432`)
 - `DATABASE_URL` — Prisma connection string
 - `API_PORT` — API server port
 - `VITE_API_URL` — API URL for Vite dev proxy
