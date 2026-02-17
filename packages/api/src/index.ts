@@ -13,6 +13,7 @@ import type {
   CreateTokenResponse,
   HealthStatus,
   PingResponse,
+  Project,
   QueryResponse,
   User,
 } from "@coqu/shared";
@@ -312,6 +313,52 @@ app.post("/api/query", requireAuth, async (req: AuthRequest, res) => {
     },
   };
   res.json(response);
+});
+
+// --- Projects ---
+
+function toProject(p: { id: string; name: string; description: string | null; path: string | null; createdAt: Date; updatedAt: Date }): Project {
+  return {
+    id: p.id,
+    name: p.name,
+    description: p.description,
+    path: p.path,
+    createdAt: p.createdAt.toISOString(),
+    updatedAt: p.updatedAt.toISOString(),
+  };
+}
+
+app.get("/api/projects", requireAuth, async (_req, res) => {
+  const projects = await prisma.project.findMany({
+    orderBy: { createdAt: "desc" },
+  });
+  const response: ApiResponse<Project[]> = {
+    success: true,
+    data: projects.map(toProject),
+  };
+  res.json(response);
+});
+
+app.post("/api/projects", requireAuth, async (req, res) => {
+  const { name, description, path } = req.body;
+  if (!name || typeof name !== "string" || name.trim().length === 0) {
+    res.status(400).json({ success: false, error: "Project name is required" } satisfies ApiResponse<never>);
+    return;
+  }
+
+  const project = await prisma.project.create({
+    data: {
+      name: name.trim(),
+      description: description?.trim() || null,
+      path: path?.trim() || null,
+    },
+  });
+
+  const response: ApiResponse<Project> = {
+    success: true,
+    data: toProject(project),
+  };
+  res.status(201).json(response);
 });
 
 // --- Graceful shutdown ---

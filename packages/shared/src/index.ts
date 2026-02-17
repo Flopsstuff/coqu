@@ -78,3 +78,19 @@ export interface QueryResponse {
   result: string;
   timestamp: string;
 }
+
+// Projects
+export interface Project {
+  id: string;
+  name: string;
+  description: string | null;
+  path: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateProjectRequest {
+  name: string;
+  description?: string;
+  path?: string;
+}

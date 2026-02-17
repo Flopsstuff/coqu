@@ -17,6 +17,7 @@ export function Header() {
         </Link>
       </h1>
       <div className="user-info">
+        <Link to="/projects" className={`btn btn-ghost${pathname === "/projects" ? " btn-ghost-active" : ""}`}>Projects</Link>
         <Link to="/tokens" className={`btn btn-ghost${pathname === "/tokens" ? " btn-ghost-active" : ""}`}>API Tokens</Link>
         <span className="user-name">{user?.name}</span>
         <button onClick={logout} className="btn btn-ghost">
