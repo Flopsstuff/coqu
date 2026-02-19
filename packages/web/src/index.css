@@ -467,3 +467,127 @@ body {
   color: var(--color-text-muted);
   font-size: 0.875rem;
 }
+
+/* --- Page header with action --- */
+
+.page-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1.5rem;
+}
+
+.page-header .page-title {
+  margin-bottom: 0;
+}
+
+.btn-add {
+  width: auto;
+  margin-top: 0;
+}
+
+/* --- Projects page --- */
+
+.projects-loading {
+  color: var(--color-text-muted);
+  font-size: 0.875rem;
+  padding: 2rem;
+  text-align: center;
+}
+
+.project-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.project-card {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  padding: 1rem 1.25rem;
+  transition: border-color 0.15s;
+}
+
+.project-card:hover {
+  border-color: var(--color-text-muted);
+}
+
+.project-card-header {
+  display: flex;
+  align-items: baseline;
+  gap: 0.75rem;
+  margin-bottom: 0.25rem;
+}
+
+.project-card-name {
+  font-size: 1rem;
+  font-weight: 500;
+  color: var(--color-text);
+}
+
+.project-card-path {
+  font-size: 0.75rem;
+  font-family: var(--font-mono);
+  color: var(--color-text-muted);
+}
+
+.project-card-description {
+  font-size: 0.875rem;
+  color: var(--color-text-muted);
+  margin-bottom: 0.5rem;
+}
+
+.project-card-meta {
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+}
+
+.project-empty {
+  text-align: center;
+  padding: 3rem 2rem;
+  color: var(--color-text-muted);
+}
+
+.project-empty p {
+  margin-bottom: 0.5rem;
+}
+
+.project-empty-hint {
+  font-size: 0.8125rem;
+}
+
+/* --- New project form --- */
+
+.new-project-form {
+  max-width: 480px;
+}
+
+.new-project-form .form-group {
+  margin-bottom: 1.25rem;
+}
+
+.form-error {
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.25);
+  color: var(--color-error);
+  padding: 0.75rem 1rem;
+  border-radius: var(--radius);
+  font-size: 0.875rem;
+  margin-bottom: 1.5rem;
+}
+
+.form-actions {
+  display: flex;
+  gap: 0.75rem;
+  margin-top: 1.5rem;
+}
+
+.form-actions .btn-ghost {
+  width: auto;
+}
+
+.btn-create {
+  width: auto;
+  margin-top: 0;
+}
