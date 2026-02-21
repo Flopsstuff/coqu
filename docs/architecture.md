@@ -43,6 +43,11 @@ Exports:
 - `CreateAgentRequest` — agent creation payload (`{ name, type }`)
 - `UpdateAgentRequest` — agent update payload (`{ name? }`)
 - `AgentEnv` — environment file content (`{ content }`)
+- `LogLevel` — log severity level (`"info" | "warn" | "error"`)
+- `LogCategory` — log source category (`"auth" | "projects" | "agents" | "git" | "system"`)
+- `LogEntry` — single log entry (level, time, msg, category, optional userId/projectId/agentId)
+- `LogsResponse` — paginated log entries (`{ entries, total, limit, offset }`)
+- `LogDatesResponse` — available log file dates (`{ dates }`)
 
 ### @coqu/api
 
@@ -51,6 +56,7 @@ REST API built with Express.js. Default port: `4000`.
 Stack:
 - **Express** — HTTP server
 - **Prisma** — PostgreSQL ORM
+- **Pino** — structured JSON logging (with **pino-roll** for daily file rotation)
 - **Helmet** — security headers
 - **CORS** — cross-origin request handling
 - **jsonwebtoken** — JWT-based authentication
@@ -98,10 +104,14 @@ Routes:
 - `POST /api/agents/:id/install` — reinstall agent SDK, returns 202 (requires auth)
 - `GET /api/env` — read global environment file (requires auth)
 - `PUT /api/env` — write global environment file (requires auth)
+- `GET /api/logs` — list log entries with filtering by date/level/category and pagination (requires auth)
+- `GET /api/logs/dates` — list available log file dates, newest first (requires auth)
 
 **Agent management:** Agents represent AI agents (currently only Claude Code). When created, the API runs `npm install -g @anthropic-ai/claude-code` asynchronously via `execFile`. Status transitions: `pending` → `installing` → `installed` or `error`. A 5-minute timeout kills stalled installs. On API startup, a health check verifies installed agents still have their binary (`which claude`) and triggers reinstallation if missing.
 
 **Global environment file:** A single `.env` file at `$HOME/.coqu/.env` is shared by all agents. The `GET/PUT /api/env` endpoints read and write this file. The directory is created automatically if it doesn't exist.
+
+**Structured logging:** All server events are logged via Pino (`packages/api/src/logger.ts`). Logs are written as NDJSON to daily-rotated files in `LOG_DIR` (default `./logs/`), named `app.{YYYY-MM-DD}.{N}.log` by pino-roll. Each entry includes a numeric level (30=info, 40=warn, 50=error), a category (`auth`, `projects`, `agents`, `git`, `system`), and optional context fields (`userId`, `projectId`, `agentId`). Log files older than `LOG_RETENTION_DAYS` (default 30) are deleted on startup and every 24 hours.
 
 Git tokens (PATs) are encrypted at rest using AES-256-GCM with a key derived from `GIT_TOKEN_SECRET`. The token is injected into the clone URL at clone time and scrubbed from any error messages. Cloned repositories are stored under `WORKSPACE_PATH` (default `/workspace`), each in a directory named by the project's UUID.
 
@@ -109,7 +119,7 @@ Git tokens (PATs) are encrypted at rest using AES-256-GCM with a key derived fro
 
 React SPA built with Vite. In dev mode runs on port `3000` and proxies `/api/*` requests to the API server.
 
-Uses `react-router-dom` for client-side routing with eleven pages:
+Uses `react-router-dom` for client-side routing with twelve pages:
 - **SetupPage** — shown when no admin account exists yet
 - **LoginPage** — email/password sign-in
 - **HomePage** — main dashboard with query interface and API health status
@@ -121,8 +131,9 @@ Uses `react-router-dom` for client-side routing with eleven pages:
 - **NewAgentPage** — create agent form (name + type dropdown)
 - **AgentDetailPage** — agent info, status, version, reinstall and delete actions, installation polling
 - **EnvPage** — global environment variable editor (textarea + save)
+- **LogsPage** — server log viewer with date/level/category filters and "Load more" pagination
 
-A shared `Header` component (`Header.tsx`) renders the navigation bar on all authenticated pages, including the logo/favicon, navigation links (with active-state highlighting for the current page), user name, and logout button.
+A shared `Header` component (`Header.tsx`) renders the navigation bar on all authenticated pages, including the logo/favicon, navigation links (Projects, Agents, Environment, Logs, API Tokens — with active-state highlighting for the current page), user name, and logout button.
 
 Auth state is managed via `AuthContext` (React context). JWT tokens are stored in `localStorage`. An `apiFetch` helper in `api.ts` automatically attaches the Bearer token to requests.
 
@@ -181,4 +192,6 @@ Defined in `.env` (template — `.env.example`):
 - `GIT_TOKEN_SECRET` — secret key for encrypting git PATs at rest (required, no default)
 - `WORKSPACE_PATH` — root directory for cloned project repos (default: `/workspace`)
 - `VITE_API_URL` — API URL for Vite dev proxy
+- `LOG_DIR` — directory for log files (default: `./logs`)
+- `LOG_RETENTION_DAYS` — days to keep log files before deletion (default: `30`)
 - `CLOUDFLARE_TUNNEL_TOKEN` — Cloudflare Tunnel token

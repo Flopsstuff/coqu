@@ -11,6 +11,7 @@ import { AgentsPage } from "./pages/AgentsPage";
 import { NewAgentPage } from "./pages/NewAgentPage";
 import { AgentDetailPage } from "./pages/AgentDetailPage";
 import { EnvPage } from "./pages/EnvPage";
+import { LogsPage } from "./pages/LogsPage";
 
 function AppRoutes() {
   const { user, needsSetup, loading } = useAuth();
@@ -44,6 +45,18 @@ function AppRoutes() {
             <Navigate to="/setup" replace />
           ) : user ? (
             <EnvPage />
+          ) : (
+            <Navigate to="/login" replace />
+          )
+        }
+      />
+      <Route
+        path="/logs"
+        element={
+          needsSetup ? (
+            <Navigate to="/setup" replace />
+          ) : user ? (
+            <LogsPage />
           ) : (
             <Navigate to="/login" replace />
           )

@@ -33,6 +33,8 @@ Edit `.env` and set production values for:
 - `JWT_SECRET` — a strong random secret for signing auth tokens (required)
 - `GIT_TOKEN_SECRET` — a strong random secret for encrypting git PATs at rest (required)
 - `WORKSPACE_PATH` — root directory for cloned project repos (default: `/workspace`)
+- `LOG_DIR` — directory for log files (default: `./logs`, which resolves to `/app/packages/api/logs/` in Docker)
+- `LOG_RETENTION_DAYS` — days to keep log files before automatic deletion (default: `30`)
 
 ### 2. Set up Cloudflare Tunnel
 

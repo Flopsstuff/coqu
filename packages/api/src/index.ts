@@ -1,6 +1,7 @@
 import crypto from "crypto";
 import fs from "fs";
 import path from "path";
+import readline from "readline";
 import { execFile, ChildProcess } from "child_process";
 import express, { Request, Response, NextFunction } from "express";
 import cors from "cors";
@@ -21,12 +22,16 @@ import type {
   CommitInfoResponse,
   CreateTokenResponse,
   HealthStatus,
+  LogDatesResponse,
+  LogEntry,
+  LogsResponse,
   PingResponse,
   Project,
   ProjectStatus,
   QueryResponse,
   User,
 } from "@coqu/shared";
+import { logger, cleanupOldLogs, LOG_DIR } from "./logger";
 
 const app = express();
 const prisma = new PrismaClient();
@@ -43,7 +48,6 @@ const GIT_TOKEN_SECRET = process.env.GIT_TOKEN_SECRET;
 
 const WORKSPACE_PATH = process.env.WORKSPACE_PATH || "/workspace";
 fs.mkdirSync(WORKSPACE_PATH, { recursive: true });
-console.log(`Workspace directory initialized at ${WORKSPACE_PATH}`);
 
 app.use(helmet());
 app.use(cors());
@@ -185,6 +189,8 @@ app.post("/api/auth/setup", async (req, res) => {
     data: { name, email, passwordHash, role: "admin" },
   });
 
+  logger.info({ category: "auth", userId: user.id }, "Admin setup completed");
+
   const token = signToken(user.id);
   const response: ApiResponse<AuthResponse> = {
     success: true,
@@ -202,16 +208,19 @@ app.post("/api/auth/login", async (req, res) => {
 
   const user = await prisma.user.findUnique({ where: { email } });
   if (!user) {
+    logger.warn({ category: "auth" }, `Login failed: unknown email ${email}`);
     res.status(401).json({ success: false, error: "Invalid credentials" } satisfies ApiResponse<never>);
     return;
   }
 
   const valid = await bcrypt.compare(password, user.passwordHash);
   if (!valid) {
+    logger.warn({ category: "auth", userId: user.id }, "Login failed: invalid password");
     res.status(401).json({ success: false, error: "Invalid credentials" } satisfies ApiResponse<never>);
     return;
   }
 
+  logger.info({ category: "auth", userId: user.id }, "Login successful");
   const token = signToken(user.id);
   const response: ApiResponse<AuthResponse> = {
     success: true,
@@ -409,6 +418,8 @@ app.post("/api/projects", requireAuth, async (req, res) => {
     },
   });
 
+  logger.info({ category: "projects", projectId: project.id }, `Project created: ${project.name}`);
+
   const response: ApiResponse<Project> = {
     success: true,
     data: toProject(project),
@@ -463,6 +474,8 @@ app.delete("/api/projects/:id", requireAuth, async (req, res) => {
 
   await prisma.project.delete({ where: { id: project.id } });
 
+  logger.info({ category: "projects", projectId: project.id }, `Project deleted: ${project.name}`);
+
   // Remove workspace directory
   const projectDir = path.join(WORKSPACE_PATH, project.id);
   fs.rm(projectDir, { recursive: true, force: true }, () => {});
@@ -501,18 +514,23 @@ function cloneProject(projectId: string, gitUrl: string, branch: string | null, 
   }
   args.push(cloneUrl, projectDir);
 
+  logger.info({ category: "git", projectId }, "Clone started");
+
   const child = execFile("git", args, { timeout: CLONE_TIMEOUT }, async (error, _stdout, stderr) => {
     activeClones.delete(projectId);
 
     if (error) {
       const isTimeout = error.killed || error.code === "ETIMEDOUT";
       const message = isTimeout ? "Clone timed out" : (pat ? scrubPat(stderr || error.message, pat) : (stderr || error.message));
+      logger.error({ category: "git", projectId }, `Clone failed: ${message}`);
       await prisma.project.update({
         where: { id: projectId },
         data: { status: "error", statusMessage: message },
       }).catch(() => {});
       return;
     }
+
+    logger.info({ category: "git", projectId }, "Clone completed successfully");
 
     // Detect actual branch after clone
     execFile("git", ["rev-parse", "--abbrev-ref", "HEAD"], { cwd: projectDir }, async (branchErr, branchStdout) => {
@@ -715,6 +733,7 @@ function installAgent(agentId: string): void {
       if (error) {
         const isTimeout = error.killed || error.code === "ETIMEDOUT";
         const message = isTimeout ? "Installation timed out" : (stderr || error.message);
+        logger.error({ category: "agents", agentId }, `Agent install failed: ${message}`);
         await prisma.agent.update({
           where: { id: agentId },
           data: { status: "error", statusMessage: message },
@@ -725,6 +744,7 @@ function installAgent(agentId: string): void {
       // Detect version
       execFile("claude", ["--version"], {}, async (verErr, verStdout) => {
         const version = verErr ? null : verStdout.trim();
+        logger.info({ category: "agents", agentId }, `Agent installed successfully (version: ${version})`);
         await prisma.agent.update({
           where: { id: agentId },
           data: { status: "installed", statusMessage: null, version },
@@ -742,7 +762,7 @@ async function checkAgentHealth(): Promise<void> {
     await new Promise<void>((resolve) => {
       execFile("which", ["claude"], {}, (err) => {
         if (err) {
-          console.log(`Agent ${agent.id} binary missing, reinstalling...`);
+          logger.warn({ category: "agents", agentId: agent.id }, "Agent binary missing, reinstalling...");
           installAgent(agent.id);
         }
         resolve();
@@ -772,6 +792,8 @@ app.post("/api/agents", requireAuth, async (req, res) => {
   const agent = await prisma.agent.create({
     data: { name: name.trim(), type },
   });
+
+  logger.info({ category: "agents", agentId: agent.id }, `Agent created: ${agent.name}`);
 
   installAgent(agent.id);
 
@@ -819,6 +841,8 @@ app.delete("/api/agents/:id", requireAuth, async (req, res) => {
   }
 
   await prisma.agent.delete({ where: { id: agent.id } });
+
+  logger.info({ category: "agents", agentId: agent.id }, `Agent deleted: ${agent.name}`);
 
   // npm uninstall -g (fire and forget)
   if (agent.type === "claude-code") {
@@ -871,6 +895,110 @@ app.put("/api/env", requireAuth, async (req, res) => {
   res.json({ success: true } satisfies ApiResponse<never>);
 });
 
+// --- Logs ---
+
+const LEVEL_MAP: Record<string, number> = { info: 30, warn: 40, error: 50 };
+
+function parseLogFile(filePath: string): Promise<LogEntry[]> {
+  return new Promise((resolve) => {
+    if (!fs.existsSync(filePath)) {
+      resolve([]);
+      return;
+    }
+
+    const entries: LogEntry[] = [];
+    const rl = readline.createInterface({
+      input: fs.createReadStream(filePath),
+      crlfDelay: Infinity,
+    });
+
+    rl.on("line", (line) => {
+      try {
+        const entry = JSON.parse(line);
+        if (entry.msg && entry.level !== undefined && entry.time !== undefined) {
+          entries.push(entry);
+        }
+      } catch {
+        // skip malformed lines
+      }
+    });
+
+    rl.on("close", () => resolve(entries));
+    rl.on("error", () => resolve(entries));
+  });
+}
+
+app.get("/api/logs", requireAuth, async (req: AuthRequest, res) => {
+  const date = (req.query.date as string) || new Date().toISOString().slice(0, 10);
+  const level = req.query.level as string | undefined;
+  const category = req.query.category as string | undefined;
+  const limit = Math.min(parseInt((req.query.limit as string) || "100", 10), 1000);
+  const offset = parseInt((req.query.offset as string) || "0", 10);
+
+  // pino-roll names files app.{date}.{N}.log — find all files for the date
+  let allFiles: string[] = [];
+  try {
+    allFiles = fs.readdirSync(LOG_DIR)
+      .filter((f) => f.startsWith(`app.${date}.`) && f.endsWith(".log"))
+      .sort();
+  } catch {
+    // directory may not exist
+  }
+
+  let entries: LogEntry[] = [];
+  for (const file of allFiles) {
+    const fileEntries = await parseLogFile(path.join(LOG_DIR, file));
+    entries.push(...fileEntries);
+  }
+
+  // Filter by level
+  if (level && LEVEL_MAP[level] !== undefined) {
+    const minLevel = LEVEL_MAP[level];
+    entries = entries.filter((e) => e.level >= minLevel);
+  }
+
+  // Filter by category
+  if (category) {
+    entries = entries.filter((e) => e.category === category);
+  }
+
+  // Reverse for newest first
+  entries.reverse();
+
+  const total = entries.length;
+  const paged = entries.slice(offset, offset + limit);
+
+  const response: ApiResponse<LogsResponse> = {
+    success: true,
+    data: { entries: paged, total, limit, offset },
+  };
+  res.json(response);
+});
+
+app.get("/api/logs/dates", requireAuth, async (_req, res) => {
+  let files: string[] = [];
+  try {
+    files = fs.readdirSync(LOG_DIR);
+  } catch {
+    // directory may not exist yet
+  }
+
+  // pino-roll names files app.{date}.{N}.log — extract unique dates
+  const dateSet = new Set<string>();
+  const dateRe = /^app\.(\d{4}-\d{2}-\d{2})\.\d+\.log$/;
+  for (const f of files) {
+    const match = f.match(dateRe);
+    if (match) dateSet.add(match[1]);
+  }
+  const dates = [...dateSet].sort().reverse();
+
+  const response: ApiResponse<LogDatesResponse> = {
+    success: true,
+    data: { dates },
+  };
+  res.json(response);
+});
+
 // --- Graceful shutdown ---
 
 process.on("SIGTERM", async () => {
@@ -879,8 +1007,10 @@ process.on("SIGTERM", async () => {
 });
 
 app.listen(port, () => {
-  console.log(`API server running on port ${port}`);
+  logger.info({ category: "system" }, `API server running on port ${port}`);
+  cleanupOldLogs();
+  setInterval(cleanupOldLogs, 24 * 60 * 60 * 1000);
   checkAgentHealth().catch((err) => {
-    console.error("Agent health check failed:", err);
+    logger.error({ category: "system" }, `Agent health check failed: ${err}`);
   });
 });
