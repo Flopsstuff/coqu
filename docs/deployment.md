@@ -87,14 +87,17 @@ This starts postgres, api, and web. Web is available at `http://localhost:3000`.
 
 ## Data persistence
 
-PostgreSQL data is stored in a named Docker volume `postgres_data`. It persists across container restarts and rebuilds.
+Two named Docker volumes persist data across container restarts and rebuilds:
 
-To reset the database:
+- **`postgres_data`** — PostgreSQL database files
+- **`home_data`** — mounted at `/root` on the API container. Persists agent data (`~/.claude/`), the global environment file (`~/.coqu/.env`), and other home-directory state. This is required because agent SDKs are installed globally via `npm install -g` at runtime and their configuration lives in `$HOME`.
+
+To reset all data:
 ```bash
 docker compose down -v
 ```
 
-**Warning:** `-v` deletes the volume and all data.
+**Warning:** `-v` deletes all volumes and all data (database, agent config, env file).
 
 ## CI/CD
 
