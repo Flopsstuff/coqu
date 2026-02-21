@@ -80,10 +80,17 @@ export interface QueryResponse {
 }
 
 // Projects
+export type ProjectStatus = "pending" | "cloning" | "ready" | "error";
+
 export interface Project {
   id: string;
   name: string;
   description: string | null;
+  gitUrl: string | null;
+  branch: string | null;
+  status: ProjectStatus;
+  statusMessage: string | null;
+  hasGitToken: boolean;
   path: string | null;
   createdAt: string;
   updatedAt: string;
@@ -92,5 +99,17 @@ export interface Project {
 export interface CreateProjectRequest {
   name: string;
   description?: string;
-  path?: string;
+  gitUrl?: string;
+  branch?: string;
+  gitToken?: string;
+}
+
+export interface BranchListResponse {
+  current: string;
+  branches: string[];
+}
+
+export interface CommitInfoResponse {
+  hash: string;
+  message: string;
 }

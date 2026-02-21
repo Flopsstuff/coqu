@@ -25,7 +25,7 @@ RUN yarn workspace @coqu/api build
 
 # Production
 FROM node:22-alpine AS production
-RUN apk upgrade --no-cache
+RUN apk upgrade --no-cache && apk add --no-cache git
 
 WORKDIR /app
 
