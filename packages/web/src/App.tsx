@@ -10,6 +10,7 @@ import { ProjectDetailPage } from "./pages/ProjectDetailPage";
 import { AgentsPage } from "./pages/AgentsPage";
 import { NewAgentPage } from "./pages/NewAgentPage";
 import { AgentDetailPage } from "./pages/AgentDetailPage";
+import { EnvPage } from "./pages/EnvPage";
 
 function AppRoutes() {
   const { user, needsSetup, loading } = useAuth();
@@ -33,6 +34,18 @@ function AppRoutes() {
             <Navigate to="/" replace />
           ) : (
             <LoginPage />
+          )
+        }
+      />
+      <Route
+        path="/env"
+        element={
+          needsSetup ? (
+            <Navigate to="/setup" replace />
+          ) : user ? (
+            <EnvPage />
+          ) : (
+            <Navigate to="/login" replace />
           )
         }
       />

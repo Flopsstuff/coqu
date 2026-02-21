@@ -19,6 +19,7 @@ export function Header() {
       <div className="user-info">
         <Link to="/projects" className={`btn btn-ghost${pathname === "/projects" ? " btn-ghost-active" : ""}`}>Projects</Link>
         <Link to="/agents" className={`btn btn-ghost${pathname === "/agents" || pathname.startsWith("/agents/") ? " btn-ghost-active" : ""}`}>Agents</Link>
+        <Link to="/env" className={`btn btn-ghost${pathname === "/env" ? " btn-ghost-active" : ""}`}>Environment</Link>
         <Link to="/tokens" className={`btn btn-ghost${pathname === "/tokens" ? " btn-ghost-active" : ""}`}>API Tokens</Link>
         <span className="user-name">{user?.name}</span>
         <button onClick={logout} className="btn btn-ghost">

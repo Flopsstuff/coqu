@@ -725,8 +725,6 @@ function installAgent(agentId: string): void {
       // Detect version
       execFile("claude", ["--version"], {}, async (verErr, verStdout) => {
         const version = verErr ? null : verStdout.trim();
-        const envDir = path.join(process.env.HOME || "/root", ".coqu", "agents", agentId);
-        fs.mkdirSync(envDir, { recursive: true });
         await prisma.agent.update({
           where: { id: agentId },
           data: { status: "installed", statusMessage: null, version },
@@ -827,10 +825,6 @@ app.delete("/api/agents/:id", requireAuth, async (req, res) => {
     execFile("npm", ["uninstall", "-g", "@anthropic-ai/claude-code"], () => {});
   }
 
-  // Remove env directory
-  const envDir = path.join(process.env.HOME || "/root", ".coqu", "agents", agent.id);
-  fs.rm(envDir, { recursive: true, force: true }, () => {});
-
   res.json({ success: true } satisfies ApiResponse<never>);
 });
 
@@ -853,14 +847,10 @@ app.post("/api/agents/:id/install", requireAuth, async (req, res) => {
   res.status(202).json(response);
 });
 
-app.get("/api/agents/:id/env", requireAuth, async (req, res) => {
-  const agent = await prisma.agent.findUnique({ where: { id: req.params.id as string } });
-  if (!agent) {
-    res.status(404).json({ success: false, error: "Agent not found" } satisfies ApiResponse<never>);
-    return;
-  }
+// --- Global Environment ---
 
-  const envPath = path.join(process.env.HOME || "/root", ".coqu", "agents", agent.id, ".env");
+app.get("/api/env", requireAuth, async (_req, res) => {
+  const envPath = path.join(process.env.HOME || "/root", ".coqu", ".env");
   let content = "";
   try {
     content = fs.readFileSync(envPath, "utf-8");
@@ -872,15 +862,9 @@ app.get("/api/agents/:id/env", requireAuth, async (req, res) => {
   res.json(response);
 });
 
-app.put("/api/agents/:id/env", requireAuth, async (req, res) => {
-  const agent = await prisma.agent.findUnique({ where: { id: req.params.id as string } });
-  if (!agent) {
-    res.status(404).json({ success: false, error: "Agent not found" } satisfies ApiResponse<never>);
-    return;
-  }
-
+app.put("/api/env", requireAuth, async (req, res) => {
   const { content } = req.body;
-  const envDir = path.join(process.env.HOME || "/root", ".coqu", "agents", agent.id);
+  const envDir = path.join(process.env.HOME || "/root", ".coqu");
   fs.mkdirSync(envDir, { recursive: true });
   fs.writeFileSync(path.join(envDir, ".env"), content ?? "");
 

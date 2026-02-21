@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import type { Agent, AgentStatus, AgentEnv } from "@coqu/shared";
+import type { Agent, AgentStatus } from "@coqu/shared";
 import { Header } from "../Header";
 import { apiFetch } from "../api";
 
@@ -17,10 +17,6 @@ export function AgentDetailPage() {
   const [agent, setAgent] = useState<Agent | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [envContent, setEnvContent] = useState("");
-  const [envLoading, setEnvLoading] = useState(true);
-  const [envSaving, setEnvSaving] = useState(false);
-  const [envSaved, setEnvSaved] = useState(false);
   const [reinstalling, setReinstalling] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -50,31 +46,6 @@ export function AgentDetailPage() {
     }, 3000);
     return () => clearInterval(interval);
   }, [agent?.status, id]);
-
-  // Load env file
-  useEffect(() => {
-    if (!id) return;
-    apiFetch<AgentEnv>(`/api/agents/${id}/env`).then((res) => {
-      if (res.success && res.data) {
-        setEnvContent(res.data.content);
-      }
-      setEnvLoading(false);
-    });
-  }, [id]);
-
-  async function handleEnvSave() {
-    setEnvSaving(true);
-    setEnvSaved(false);
-    const res = await apiFetch<never>(`/api/agents/${id}/env`, {
-      method: "PUT",
-      body: JSON.stringify({ content: envContent }),
-    });
-    setEnvSaving(false);
-    if (res.success) {
-      setEnvSaved(true);
-      setTimeout(() => setEnvSaved(false), 2000);
-    }
-  }
 
   async function handleReinstall() {
     setReinstalling(true);
@@ -193,32 +164,6 @@ export function AgentDetailPage() {
             </div>
           </div>
 
-          <div className="project-detail-section">
-            <h3>Environment Variables</h3>
-            {envLoading ? (
-              <div className="projects-loading">Loading env...</div>
-            ) : (
-              <>
-                <textarea
-                  className="env-editor"
-                  value={envContent}
-                  onChange={(e) => setEnvContent(e.target.value)}
-                  placeholder="ANTHROPIC_API_KEY=sk-ant-..."
-                  rows={10}
-                  style={{ width: "100%", fontFamily: "monospace", resize: "vertical" }}
-                />
-                <div className="detail-actions" style={{ marginTop: 8 }}>
-                  <button
-                    className="btn btn-primary"
-                    onClick={handleEnvSave}
-                    disabled={envSaving}
-                  >
-                    {envSaving ? "Saving..." : envSaved ? "Saved!" : "Save"}
-                  </button>
-                </div>
-              </>
-            )}
-          </div>
         </div>
       </div>
     </div>
