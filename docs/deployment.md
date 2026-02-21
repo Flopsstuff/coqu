@@ -31,6 +31,8 @@ Edit `.env` and set production values for:
 - `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB`
 - `DATABASE_URL` (must match the postgres credentials above)
 - `JWT_SECRET` — a strong random secret for signing auth tokens (required)
+- `GIT_TOKEN_SECRET` — a strong random secret for encrypting git PATs at rest (required)
+- `WORKSPACE_PATH` — root directory for cloned project repos (default: `/workspace`)
 
 ### 2. Set up Cloudflare Tunnel
 

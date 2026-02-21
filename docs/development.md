@@ -15,7 +15,7 @@ yarn install
 
 # Create environment file
 cp .env.example .env
-# Edit .env and set JWT_SECRET (required for the API to start)
+# Edit .env and set JWT_SECRET and GIT_TOKEN_SECRET (required for the API to start)
 
 # Start everything (postgres in Docker + API + Web locally)
 yarn dev
@@ -91,6 +91,7 @@ The database always runs in Docker. The host in `DATABASE_URL` depends on **wher
    ```
    DATABASE_URL=postgresql://coqu:coqu_secret@localhost:5432/coqu
    JWT_SECRET=change-me-in-production
+   GIT_TOKEN_SECRET=change-me-in-production
    ```
 
    > **Important:** use `localhost` (not `postgres`) — Prisma runs on the host, not inside Docker.
@@ -153,9 +154,14 @@ coqu/
 │       │   ├── Header.tsx
 │       │   ├── api.ts
 │       │   ├── index.css
+│       │   ├── components/
+│       │   │   └── ProjectCard.tsx
 │       │   └── pages/
 │       │       ├── HomePage.tsx
 │       │       ├── LoginPage.tsx
+│       │       ├── NewProjectPage.tsx
+│       │       ├── ProjectDetailPage.tsx
+│       │       ├── ProjectsPage.tsx
 │       │       ├── SetupPage.tsx
 │       │       └── TokensPage.tsx
 │       ├── public/
