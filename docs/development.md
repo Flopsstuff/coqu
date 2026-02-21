@@ -157,8 +157,12 @@ coqu/
 │       │   ├── components/
 │       │   │   └── ProjectCard.tsx
 │       │   └── pages/
+│       │       ├── AgentDetailPage.tsx
+│       │       ├── AgentsPage.tsx
+│       │       ├── EnvPage.tsx
 │       │       ├── HomePage.tsx
 │       │       ├── LoginPage.tsx
+│       │       ├── NewAgentPage.tsx
 │       │       ├── NewProjectPage.tsx
 │       │       ├── ProjectDetailPage.tsx
 │       │       ├── ProjectsPage.tsx

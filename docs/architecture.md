@@ -37,6 +37,12 @@ Exports:
 - `CreateProjectRequest` — project creation payload (name, optional gitUrl/branch/gitToken)
 - `BranchListResponse` — current branch + list of all branches
 - `CommitInfoResponse` — latest commit hash + message
+- `AgentType` — agent type (`"claude-code"`)
+- `AgentStatus` — agent lifecycle status (`"pending" | "installing" | "installed" | "error"`)
+- `Agent` — agent entity interface
+- `CreateAgentRequest` — agent creation payload (`{ name, type }`)
+- `UpdateAgentRequest` — agent update payload (`{ name? }`)
+- `AgentEnv` — environment file content (`{ content }`)
 
 ### @coqu/api
 
@@ -84,6 +90,18 @@ Routes:
 - `POST /api/projects/:id/checkout` — switch branch via `git checkout` (requires auth)
 - `GET /api/projects/:id/commit` — get latest commit hash and message (requires auth)
 - `POST /api/projects/:id/pull` — pull latest changes from origin (requires auth)
+- `GET /api/agents` — list all agents (requires auth)
+- `POST /api/agents` — create agent, triggers async SDK installation (requires auth)
+- `GET /api/agents/:id` — get a single agent (requires auth)
+- `PATCH /api/agents/:id` — update agent name (requires auth)
+- `DELETE /api/agents/:id` — delete agent, uninstall SDK globally (requires auth)
+- `POST /api/agents/:id/install` — reinstall agent SDK, returns 202 (requires auth)
+- `GET /api/env` — read global environment file (requires auth)
+- `PUT /api/env` — write global environment file (requires auth)
+
+**Agent management:** Agents represent AI agents (currently only Claude Code). When created, the API runs `npm install -g @anthropic-ai/claude-code` asynchronously via `execFile`. Status transitions: `pending` → `installing` → `installed` or `error`. A 5-minute timeout kills stalled installs. On API startup, a health check verifies installed agents still have their binary (`which claude`) and triggers reinstallation if missing.
+
+**Global environment file:** A single `.env` file at `$HOME/.coqu/.env` is shared by all agents. The `GET/PUT /api/env` endpoints read and write this file. The directory is created automatically if it doesn't exist.
 
 Git tokens (PATs) are encrypted at rest using AES-256-GCM with a key derived from `GIT_TOKEN_SECRET`. The token is injected into the clone URL at clone time and scrubbed from any error messages. Cloned repositories are stored under `WORKSPACE_PATH` (default `/workspace`), each in a directory named by the project's UUID.
 
@@ -91,7 +109,7 @@ Git tokens (PATs) are encrypted at rest using AES-256-GCM with a key derived fro
 
 React SPA built with Vite. In dev mode runs on port `3000` and proxies `/api/*` requests to the API server.
 
-Uses `react-router-dom` for client-side routing with seven pages:
+Uses `react-router-dom` for client-side routing with eleven pages:
 - **SetupPage** — shown when no admin account exists yet
 - **LoginPage** — email/password sign-in
 - **HomePage** — main dashboard with query interface and API health status
@@ -99,6 +117,10 @@ Uses `react-router-dom` for client-side routing with seven pages:
 - **ProjectsPage** — project list with status badges, branch, and path info
 - **NewProjectPage** — create a project (name, description, git URL, branch, git token)
 - **ProjectDetailPage** — project info, clone/pull/delete actions, branch switcher, commit info
+- **AgentsPage** — agent list with status badges (pending/installing/installed/error)
+- **NewAgentPage** — create agent form (name + type dropdown)
+- **AgentDetailPage** — agent info, status, version, reinstall and delete actions, installation polling
+- **EnvPage** — global environment variable editor (textarea + save)
 
 A shared `Header` component (`Header.tsx`) renders the navigation bar on all authenticated pages, including the logo/favicon, navigation links (with active-state highlighting for the current page), user name, and logout button.
 
@@ -125,6 +147,7 @@ Models:
 - **User** — admin accounts (email, name, passwordHash, role)
 - **ApiToken** — personal API tokens (hashed, linked to User)
 - **Project** — git-backed projects (name, gitUrl, branch, status, encrypted gitToken, workspace path)
+- **Agent** — AI agents (name, type, status, statusMessage, version)
 
 ## Network architecture (Docker)
 
