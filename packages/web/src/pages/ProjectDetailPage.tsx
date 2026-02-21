@@ -158,6 +158,12 @@ export function ProjectDetailPage() {
                 {project.hasGitToken ? "Configured" : "Not configured"}
               </div>
             </div>
+            {project.path && (
+              <div className="detail-field">
+                <div className="detail-label">Path</div>
+                <div className="detail-value mono">{project.path}</div>
+              </div>
+            )}
             {project.statusMessage && (
               <div className="detail-field">
                 <div className="detail-label">Status Message</div>

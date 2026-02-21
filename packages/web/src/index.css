@@ -535,6 +535,12 @@ body {
   color: var(--color-text-muted);
 }
 
+.project-card-details {
+  display: flex;
+  gap: 1rem;
+  margin-top: 0.25rem;
+}
+
 .project-card-description {
   font-size: 0.875rem;
   color: var(--color-text-muted);

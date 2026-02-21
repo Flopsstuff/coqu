@@ -27,6 +27,12 @@ export function ProjectCard({ project }: ProjectCardProps) {
       {project.gitUrl && (
         <span className="project-card-path">{project.gitUrl}</span>
       )}
+      {(project.branch || project.path) && (
+        <div className="project-card-details">
+          {project.branch && <span className="project-card-path">{project.branch}</span>}
+          {project.path && <span className="project-card-path">{project.path}</span>}
+        </div>
+      )}
       <div className="project-card-meta">
         Created {new Date(project.createdAt).toLocaleDateString()}
       </div>
