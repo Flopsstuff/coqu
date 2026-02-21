@@ -29,6 +29,7 @@ services:
       WORKSPACE_PATH: /workspace
     volumes:
       - workspace_data:/workspace
+      - home_data:/root
     ports:
       - "4000:4000"
     depends_on:
@@ -59,3 +60,4 @@ services:
 volumes:
   postgres_data:
   workspace_data:
+  home_data:

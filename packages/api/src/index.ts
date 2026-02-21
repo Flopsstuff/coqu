@@ -9,6 +9,10 @@ import { PrismaClient, User as PrismaUser } from "@prisma/client";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import type {
+  Agent,
+  AgentEnv,
+  AgentStatus,
+  AgentType,
   ApiResponse,
   ApiToken,
   AuthResponse,
@@ -682,6 +686,207 @@ app.post("/api/projects/:id/pull", requireAuth, async (req, res) => {
   });
 });
 
+// --- Agents ---
+
+function toAgent(a: { id: string; name: string; type: string; status: string; statusMessage: string | null; version: string | null; createdAt: Date; updatedAt: Date }): Agent {
+  return {
+    id: a.id,
+    name: a.name,
+    type: a.type as AgentType,
+    status: a.status as AgentStatus,
+    statusMessage: a.statusMessage,
+    version: a.version,
+    createdAt: a.createdAt.toISOString(),
+    updatedAt: a.updatedAt.toISOString(),
+  };
+}
+
+const activeInstalls = new Map<string, ChildProcess>();
+const INSTALL_TIMEOUT = 5 * 60 * 1000; // 5 minutes
+
+function installAgent(agentId: string): void {
+  prisma.agent.update({
+    where: { id: agentId },
+    data: { status: "installing", statusMessage: null },
+  }).then(() => {
+    const child = execFile("npm", ["install", "-g", "@anthropic-ai/claude-code"], { timeout: INSTALL_TIMEOUT }, async (error, _stdout, stderr) => {
+      activeInstalls.delete(agentId);
+
+      if (error) {
+        const isTimeout = error.killed || error.code === "ETIMEDOUT";
+        const message = isTimeout ? "Installation timed out" : (stderr || error.message);
+        await prisma.agent.update({
+          where: { id: agentId },
+          data: { status: "error", statusMessage: message },
+        }).catch(() => {});
+        return;
+      }
+
+      // Detect version
+      execFile("claude", ["--version"], {}, async (verErr, verStdout) => {
+        const version = verErr ? null : verStdout.trim();
+        const envDir = path.join(process.env.HOME || "/root", ".coqu", "agents", agentId);
+        fs.mkdirSync(envDir, { recursive: true });
+        await prisma.agent.update({
+          where: { id: agentId },
+          data: { status: "installed", statusMessage: null, version },
+        }).catch(() => {});
+      });
+    });
+
+    activeInstalls.set(agentId, child);
+  }).catch(() => {});
+}
+
+async function checkAgentHealth(): Promise<void> {
+  const agents = await prisma.agent.findMany({ where: { status: "installed" } });
+  for (const agent of agents) {
+    await new Promise<void>((resolve) => {
+      execFile("which", ["claude"], {}, (err) => {
+        if (err) {
+          console.log(`Agent ${agent.id} binary missing, reinstalling...`);
+          installAgent(agent.id);
+        }
+        resolve();
+      });
+    });
+  }
+}
+
+app.get("/api/agents", requireAuth, async (_req, res) => {
+  const agents = await prisma.agent.findMany({ orderBy: { createdAt: "desc" } });
+  const response: ApiResponse<Agent[]> = { success: true, data: agents.map(toAgent) };
+  res.json(response);
+});
+
+app.post("/api/agents", requireAuth, async (req, res) => {
+  const { name, type } = req.body;
+  if (!name || typeof name !== "string" || name.trim().length === 0) {
+    res.status(400).json({ success: false, error: "Agent name is required" } satisfies ApiResponse<never>);
+    return;
+  }
+  const validTypes = ["claude-code"];
+  if (!type || !validTypes.includes(type)) {
+    res.status(400).json({ success: false, error: "Invalid agent type" } satisfies ApiResponse<never>);
+    return;
+  }
+
+  const agent = await prisma.agent.create({
+    data: { name: name.trim(), type },
+  });
+
+  installAgent(agent.id);
+
+  const response: ApiResponse<Agent> = { success: true, data: toAgent(agent) };
+  res.status(201).json(response);
+});
+
+app.get("/api/agents/:id", requireAuth, async (req, res) => {
+  const agent = await prisma.agent.findUnique({ where: { id: req.params.id as string } });
+  if (!agent) {
+    res.status(404).json({ success: false, error: "Agent not found" } satisfies ApiResponse<never>);
+    return;
+  }
+  const response: ApiResponse<Agent> = { success: true, data: toAgent(agent) };
+  res.json(response);
+});
+
+app.patch("/api/agents/:id", requireAuth, async (req, res) => {
+  const agent = await prisma.agent.findUnique({ where: { id: req.params.id as string } });
+  if (!agent) {
+    res.status(404).json({ success: false, error: "Agent not found" } satisfies ApiResponse<never>);
+    return;
+  }
+
+  const data: Record<string, unknown> = {};
+  if (req.body.name !== undefined) data.name = req.body.name.trim();
+
+  const updated = await prisma.agent.update({ where: { id: agent.id }, data });
+  const response: ApiResponse<Agent> = { success: true, data: toAgent(updated) };
+  res.json(response);
+});
+
+app.delete("/api/agents/:id", requireAuth, async (req, res) => {
+  const agent = await prisma.agent.findUnique({ where: { id: req.params.id as string } });
+  if (!agent) {
+    res.status(404).json({ success: false, error: "Agent not found" } satisfies ApiResponse<never>);
+    return;
+  }
+
+  // Kill active install if any
+  const activeInstall = activeInstalls.get(agent.id);
+  if (activeInstall) {
+    activeInstall.kill();
+    activeInstalls.delete(agent.id);
+  }
+
+  await prisma.agent.delete({ where: { id: agent.id } });
+
+  // npm uninstall -g (fire and forget)
+  if (agent.type === "claude-code") {
+    execFile("npm", ["uninstall", "-g", "@anthropic-ai/claude-code"], () => {});
+  }
+
+  // Remove env directory
+  const envDir = path.join(process.env.HOME || "/root", ".coqu", "agents", agent.id);
+  fs.rm(envDir, { recursive: true, force: true }, () => {});
+
+  res.json({ success: true } satisfies ApiResponse<never>);
+});
+
+app.post("/api/agents/:id/install", requireAuth, async (req, res) => {
+  const agent = await prisma.agent.findUnique({ where: { id: req.params.id as string } });
+  if (!agent) {
+    res.status(404).json({ success: false, error: "Agent not found" } satisfies ApiResponse<never>);
+    return;
+  }
+
+  if (agent.status === "installing") {
+    res.status(409).json({ success: false, error: "Installation already in progress" } satisfies ApiResponse<never>);
+    return;
+  }
+
+  installAgent(agent.id);
+
+  const updated = await prisma.agent.findUnique({ where: { id: agent.id } });
+  const response: ApiResponse<Agent> = { success: true, data: toAgent(updated!) };
+  res.status(202).json(response);
+});
+
+app.get("/api/agents/:id/env", requireAuth, async (req, res) => {
+  const agent = await prisma.agent.findUnique({ where: { id: req.params.id as string } });
+  if (!agent) {
+    res.status(404).json({ success: false, error: "Agent not found" } satisfies ApiResponse<never>);
+    return;
+  }
+
+  const envPath = path.join(process.env.HOME || "/root", ".coqu", "agents", agent.id, ".env");
+  let content = "";
+  try {
+    content = fs.readFileSync(envPath, "utf-8");
+  } catch {
+    // File doesn't exist, return empty
+  }
+
+  const response: ApiResponse<AgentEnv> = { success: true, data: { content } };
+  res.json(response);
+});
+
+app.put("/api/agents/:id/env", requireAuth, async (req, res) => {
+  const agent = await prisma.agent.findUnique({ where: { id: req.params.id as string } });
+  if (!agent) {
+    res.status(404).json({ success: false, error: "Agent not found" } satisfies ApiResponse<never>);
+    return;
+  }
+
+  const { content } = req.body;
+  const envDir = path.join(process.env.HOME || "/root", ".coqu", "agents", agent.id);
+  fs.mkdirSync(envDir, { recursive: true });
+  fs.writeFileSync(path.join(envDir, ".env"), content ?? "");
+
+  res.json({ success: true } satisfies ApiResponse<never>);
+});
+
 // --- Graceful shutdown ---
 
 process.on("SIGTERM", async () => {
@@ -691,4 +896,7 @@ process.on("SIGTERM", async () => {
 
 app.listen(port, () => {
   console.log(`API server running on port ${port}`);
+  checkAgentHealth().catch((err) => {
+    console.error("Agent health check failed:", err);
+  });
 });

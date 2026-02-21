@@ -113,3 +113,32 @@ export interface CommitInfoResponse {
   hash: string;
   message: string;
 }
+
+// Agents
+export type AgentType = "claude-code";
+
+export type AgentStatus = "pending" | "installing" | "installed" | "error";
+
+export interface Agent {
+  id: string;
+  name: string;
+  type: AgentType;
+  status: AgentStatus;
+  statusMessage: string | null;
+  version: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateAgentRequest {
+  name: string;
+  type: AgentType;
+}
+
+export interface UpdateAgentRequest {
+  name?: string;
+}
+
+export interface AgentEnv {
+  content: string;
+}
