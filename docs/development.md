@@ -143,7 +143,9 @@ coqu/
 │   ├── shared/              — shared types
 │   │   └── src/index.ts
 │   ├── api/                 — REST API
-│   │   ├── src/index.ts
+│   │   ├── src/
+│   │   │   ├── index.ts
+│   │   │   └── logger.ts
 │   │   └── prisma/
 │   │       └── schema.prisma
 │   └── web/                 — React SPA
@@ -161,6 +163,7 @@ coqu/
 │       │       ├── AgentsPage.tsx
 │       │       ├── EnvPage.tsx
 │       │       ├── HomePage.tsx
+│       │       ├── LogsPage.tsx
 │       │       ├── LoginPage.tsx
 │       │       ├── NewAgentPage.tsx
 │       │       ├── NewProjectPage.tsx
