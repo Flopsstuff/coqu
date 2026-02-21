@@ -26,6 +26,7 @@ export function ProjectDetailPage() {
   const [currentBranch, setCurrentBranch] = useState("");
   const [selectedBranch, setSelectedBranch] = useState("");
   const [switching, setSwitching] = useState(false);
+  const [pulling, setPulling] = useState(false);
 
   const loadProject = useCallback(async () => {
     const res = await apiFetch<Project>(`/api/projects/${id}`);
@@ -83,6 +84,18 @@ export function ProjectDetailPage() {
       setError(res.error ?? "Failed to switch branch");
     }
     setSwitching(false);
+  }
+
+  async function handlePull() {
+    setPulling(true);
+    setError(null);
+    const res = await apiFetch<Project>(`/api/projects/${id}/pull`, { method: "POST" });
+    if (res.success && res.data) {
+      setProject(res.data);
+    } else {
+      setError(res.error ?? "Failed to pull");
+    }
+    setPulling(false);
   }
 
   async function handleClone() {
@@ -215,8 +228,17 @@ export function ProjectDetailPage() {
                   {cloning ? "Starting clone..." : "Clone Repository"}
                 </button>
               )}
+              {project.status === "ready" && (
+                <button
+                  className="btn btn-ghost"
+                  onClick={handlePull}
+                  disabled={pulling}
+                >
+                  {pulling ? "Pulling..." : "Pull"}
+                </button>
+              )}
               <button
-                className={`btn ${confirmDelete ? "btn-danger" : "btn-ghost"}`}
+                className="btn btn-danger"
                 onClick={handleDelete}
                 disabled={deleting}
               >
