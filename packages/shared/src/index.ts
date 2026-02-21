@@ -142,3 +142,29 @@ export interface UpdateAgentRequest {
 export interface AgentEnv {
   content: string;
 }
+
+// Logs
+export type LogLevel = "info" | "warn" | "error";
+
+export type LogCategory = "auth" | "projects" | "agents" | "git" | "system";
+
+export interface LogEntry {
+  level: number;
+  time: number;
+  msg: string;
+  category: LogCategory;
+  userId?: string;
+  projectId?: string;
+  agentId?: string;
+}
+
+export interface LogsResponse {
+  entries: LogEntry[];
+  total: number;
+  limit: number;
+  offset: number;
+}
+
+export interface LogDatesResponse {
+  dates: string[];
+}
