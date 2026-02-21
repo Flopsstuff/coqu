@@ -1,4 +1,7 @@
 import crypto from "crypto";
+import fs from "fs";
+import path from "path";
+import { execFile, ChildProcess } from "child_process";
 import express, { Request, Response, NextFunction } from "express";
 import cors from "cors";
 import helmet from "helmet";
@@ -14,6 +17,7 @@ import type {
   HealthStatus,
   PingResponse,
   Project,
+  ProjectStatus,
   QueryResponse,
   User,
 } from "@coqu/shared";
@@ -25,6 +29,15 @@ if (!process.env.JWT_SECRET) {
   throw new Error("JWT_SECRET environment variable must be set");
 }
 const JWT_SECRET = process.env.JWT_SECRET;
+
+if (!process.env.GIT_TOKEN_SECRET) {
+  throw new Error("GIT_TOKEN_SECRET environment variable must be set");
+}
+const GIT_TOKEN_SECRET = process.env.GIT_TOKEN_SECRET;
+
+const WORKSPACE_PATH = process.env.WORKSPACE_PATH || "/workspace";
+fs.mkdirSync(WORKSPACE_PATH, { recursive: true });
+console.log(`Workspace directory initialized at ${WORKSPACE_PATH}`);
 
 app.use(helmet());
 app.use(cors());
@@ -52,6 +65,32 @@ function generateToken(): string {
 
 function hashToken(raw: string): string {
   return crypto.createHash("sha256").update(raw).digest("hex");
+}
+
+// --- Git token encryption ---
+
+function deriveEncryptionKey(secret: string): Buffer {
+  return crypto.createHash("sha256").update(secret).digest();
+}
+
+const encryptionKey = deriveEncryptionKey(GIT_TOKEN_SECRET);
+
+function encryptToken(plaintext: string): string {
+  const iv = crypto.randomBytes(12);
+  const cipher = crypto.createCipheriv("aes-256-gcm", encryptionKey, iv);
+  const encrypted = Buffer.concat([cipher.update(plaintext, "utf8"), cipher.final()]);
+  const authTag = cipher.getAuthTag();
+  return Buffer.concat([iv, authTag, encrypted]).toString("base64");
+}
+
+function decryptToken(encrypted: string): string {
+  const buf = Buffer.from(encrypted, "base64");
+  const iv = buf.subarray(0, 12);
+  const authTag = buf.subarray(12, 28);
+  const ciphertext = buf.subarray(28);
+  const decipher = crypto.createDecipheriv("aes-256-gcm", encryptionKey, iv);
+  decipher.setAuthTag(authTag);
+  return decipher.update(ciphertext) + decipher.final("utf8");
 }
 
 // --- Auth middleware ---
@@ -317,11 +356,19 @@ app.post("/api/query", requireAuth, async (req: AuthRequest, res) => {
 
 // --- Projects ---
 
-function toProject(p: { id: string; name: string; description: string | null; path: string | null; createdAt: Date; updatedAt: Date }): Project {
+// Track active clone processes for cleanup on delete
+const activeClones = new Map<string, ChildProcess>();
+
+function toProject(p: { id: string; name: string; description: string | null; gitUrl: string | null; branch: string | null; status: string; statusMessage: string | null; gitToken: string | null; path: string | null; createdAt: Date; updatedAt: Date }): Project {
   return {
     id: p.id,
     name: p.name,
     description: p.description,
+    gitUrl: p.gitUrl,
+    branch: p.branch,
+    status: p.status as ProjectStatus,
+    statusMessage: p.statusMessage,
+    hasGitToken: p.gitToken !== null,
     path: p.path,
     createdAt: p.createdAt.toISOString(),
     updatedAt: p.updatedAt.toISOString(),
@@ -340,7 +387,7 @@ app.get("/api/projects", requireAuth, async (_req, res) => {
 });
 
 app.post("/api/projects", requireAuth, async (req, res) => {
-  const { name, description, path } = req.body;
+  const { name, description, gitUrl, branch, gitToken } = req.body;
   if (!name || typeof name !== "string" || name.trim().length === 0) {
     res.status(400).json({ success: false, error: "Project name is required" } satisfies ApiResponse<never>);
     return;
@@ -350,7 +397,9 @@ app.post("/api/projects", requireAuth, async (req, res) => {
     data: {
       name: name.trim(),
       description: description?.trim() || null,
-      path: path?.trim() || null,
+      gitUrl: gitUrl?.trim() || null,
+      branch: branch?.trim() || null,
+      gitToken: gitToken ? encryptToken(gitToken) : null,
     },
   });
 
@@ -359,6 +408,146 @@ app.post("/api/projects", requireAuth, async (req, res) => {
     data: toProject(project),
   };
   res.status(201).json(response);
+});
+
+app.get("/api/projects/:id", requireAuth, async (req, res) => {
+  const project = await prisma.project.findUnique({ where: { id: req.params.id as string } });
+  if (!project) {
+    res.status(404).json({ success: false, error: "Project not found" } satisfies ApiResponse<never>);
+    return;
+  }
+  const response: ApiResponse<Project> = { success: true, data: toProject(project) };
+  res.json(response);
+});
+
+app.patch("/api/projects/:id", requireAuth, async (req, res) => {
+  const project = await prisma.project.findUnique({ where: { id: req.params.id as string } });
+  if (!project) {
+    res.status(404).json({ success: false, error: "Project not found" } satisfies ApiResponse<never>);
+    return;
+  }
+
+  const data: Record<string, unknown> = {};
+  if (req.body.name !== undefined) data.name = req.body.name.trim();
+  if (req.body.description !== undefined) data.description = req.body.description?.trim() || null;
+  if (req.body.gitUrl !== undefined) data.gitUrl = req.body.gitUrl?.trim() || null;
+  if (req.body.branch !== undefined) data.branch = req.body.branch?.trim() || null;
+  if (req.body.gitToken !== undefined) {
+    data.gitToken = req.body.gitToken ? encryptToken(req.body.gitToken) : null;
+  }
+
+  const updated = await prisma.project.update({ where: { id: req.params.id as string }, data });
+  const response: ApiResponse<Project> = { success: true, data: toProject(updated) };
+  res.json(response);
+});
+
+app.delete("/api/projects/:id", requireAuth, async (req, res) => {
+  const project = await prisma.project.findUnique({ where: { id: req.params.id as string } });
+  if (!project) {
+    res.status(404).json({ success: false, error: "Project not found" } satisfies ApiResponse<never>);
+    return;
+  }
+
+  // Kill active clone if any
+  const activeClone = activeClones.get(project.id);
+  if (activeClone) {
+    activeClone.kill();
+    activeClones.delete(project.id);
+  }
+
+  await prisma.project.delete({ where: { id: project.id } });
+
+  // Remove workspace directory
+  const projectDir = path.join(WORKSPACE_PATH, project.id);
+  fs.rm(projectDir, { recursive: true, force: true }, () => {});
+
+  res.json({ success: true } satisfies ApiResponse<never>);
+});
+
+// --- Git Clone ---
+
+const CLONE_TIMEOUT = 5 * 60 * 1000; // 5 minutes
+
+function injectPatIntoUrl(gitUrl: string, pat: string): string {
+  const url = new URL(gitUrl);
+  url.username = pat;
+  url.password = "";
+  return url.toString();
+}
+
+function scrubPat(message: string, pat: string): string {
+  return message.replaceAll(pat, "***");
+}
+
+function cloneProject(projectId: string, gitUrl: string, branch: string | null, encryptedToken: string | null): void {
+  const projectDir = path.join(WORKSPACE_PATH, projectId);
+  let pat: string | null = null;
+  let cloneUrl = gitUrl;
+
+  if (encryptedToken) {
+    pat = decryptToken(encryptedToken);
+    cloneUrl = injectPatIntoUrl(gitUrl, pat);
+  }
+
+  const args = ["clone"];
+  if (branch) {
+    args.push("--branch", branch, "--single-branch");
+  }
+  args.push(cloneUrl, projectDir);
+
+  const child = execFile("git", args, { timeout: CLONE_TIMEOUT }, async (error, _stdout, stderr) => {
+    activeClones.delete(projectId);
+
+    if (error) {
+      const isTimeout = error.killed || error.code === "ETIMEDOUT";
+      const message = isTimeout ? "Clone timed out" : (pat ? scrubPat(stderr || error.message, pat) : (stderr || error.message));
+      await prisma.project.update({
+        where: { id: projectId },
+        data: { status: "error", statusMessage: message },
+      }).catch(() => {});
+      return;
+    }
+
+    await prisma.project.update({
+      where: { id: projectId },
+      data: { status: "ready", path: projectDir, statusMessage: null },
+    }).catch(() => {});
+  });
+
+  activeClones.set(projectId, child);
+}
+
+app.post("/api/projects/:id/clone", requireAuth, async (req, res) => {
+  const project = await prisma.project.findUnique({ where: { id: req.params.id as string } });
+  if (!project) {
+    res.status(404).json({ success: false, error: "Project not found" } satisfies ApiResponse<never>);
+    return;
+  }
+
+  if (!project.gitUrl) {
+    res.status(400).json({ success: false, error: "Project has no git URL" } satisfies ApiResponse<never>);
+    return;
+  }
+
+  if (project.status === "cloning") {
+    res.status(409).json({ success: false, error: "Clone already in progress" } satisfies ApiResponse<never>);
+    return;
+  }
+
+  if (project.status === "ready") {
+    res.status(409).json({ success: false, error: "Project already cloned" } satisfies ApiResponse<never>);
+    return;
+  }
+
+  const updated = await prisma.project.update({
+    where: { id: project.id },
+    data: { status: "cloning", statusMessage: null },
+  });
+
+  cloneProject(project.id, project.gitUrl, project.branch, project.gitToken);
+
+  const response: ApiResponse<Project> = { success: true, data: toProject(updated) };
+  res.status(202).json(response);
 });
 
 // --- Graceful shutdown ---

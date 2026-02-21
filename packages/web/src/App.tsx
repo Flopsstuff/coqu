@@ -6,6 +6,7 @@ import { HomePage } from "./pages/HomePage";
 import { TokensPage } from "./pages/TokensPage";
 import { ProjectsPage } from "./pages/ProjectsPage";
 import { NewProjectPage } from "./pages/NewProjectPage";
+import { ProjectDetailPage } from "./pages/ProjectDetailPage";
 
 function AppRoutes() {
   const { user, needsSetup, loading } = useAuth();
@@ -63,6 +64,18 @@ function AppRoutes() {
             <Navigate to="/setup" replace />
           ) : user ? (
             <NewProjectPage />
+          ) : (
+            <Navigate to="/login" replace />
+          )
+        }
+      />
+      <Route
+        path="/projects/:id"
+        element={
+          needsSetup ? (
+            <Navigate to="/setup" replace />
+          ) : user ? (
+            <ProjectDetailPage />
           ) : (
             <Navigate to="/login" replace />
           )

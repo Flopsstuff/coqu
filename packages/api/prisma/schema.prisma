@@ -31,10 +31,15 @@ model ApiToken {
 }
 
 model Project {
-  id          String   @id @default(uuid())
-  name        String
-  description String?
-  path        String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id            String   @id @default(uuid())
+  name          String
+  description   String?
+  gitUrl        String?
+  branch        String?
+  status        String   @default("pending")
+  statusMessage String?
+  gitToken      String?
+  path          String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 }

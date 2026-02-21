@@ -8,7 +8,9 @@ export function NewProjectPage() {
   const navigate = useNavigate();
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
-  const [path, setPath] = useState("");
+  const [gitUrl, setGitUrl] = useState("");
+  const [branch, setBranch] = useState("");
+  const [gitToken, setGitToken] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
@@ -22,7 +24,9 @@ export function NewProjectPage() {
       body: JSON.stringify({
         name: name.trim(),
         description: description.trim() || undefined,
-        path: path.trim() || undefined,
+        gitUrl: gitUrl.trim() || undefined,
+        branch: branch.trim() || undefined,
+        gitToken: gitToken || undefined,
       }),
     });
 
@@ -71,13 +75,35 @@ export function NewProjectPage() {
           </div>
 
           <div className="form-group">
-            <label htmlFor="path">Path</label>
+            <label htmlFor="gitUrl">Git URL</label>
             <input
-              id="path"
+              id="gitUrl"
               type="text"
-              value={path}
-              onChange={(e) => setPath(e.target.value)}
-              placeholder="/path/to/project (optional)"
+              value={gitUrl}
+              onChange={(e) => setGitUrl(e.target.value)}
+              placeholder="https://github.com/user/repo.git (optional)"
+            />
+          </div>
+
+          <div className="form-group">
+            <label htmlFor="branch">Branch</label>
+            <input
+              id="branch"
+              type="text"
+              value={branch}
+              onChange={(e) => setBranch(e.target.value)}
+              placeholder="main (optional, defaults to repo default)"
+            />
+          </div>
+
+          <div className="form-group">
+            <label htmlFor="gitToken">Git Token (PAT)</label>
+            <input
+              id="gitToken"
+              type="password"
+              value={gitToken}
+              onChange={(e) => setGitToken(e.target.value)}
+              placeholder="For private repos (optional)"
             />
           </div>
 
