@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import type { Project, ProjectStatus } from "@coqu/shared";
+import type { Project, ProjectStatus, BranchListResponse } from "@coqu/shared";
 import { Header } from "../Header";
 import { apiFetch } from "../api";
 
@@ -22,6 +22,10 @@ export function ProjectDetailPage() {
   const [cloning, setCloning] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [branches, setBranches] = useState<string[]>([]);
+  const [currentBranch, setCurrentBranch] = useState("");
+  const [selectedBranch, setSelectedBranch] = useState("");
+  const [switching, setSwitching] = useState(false);
 
   const loadProject = useCallback(async () => {
     const res = await apiFetch<Project>(`/api/projects/${id}`);
@@ -51,6 +55,35 @@ export function ProjectDetailPage() {
     }, 3000);
     return () => clearInterval(interval);
   }, [project?.status, id]);
+
+  // Load branches when project is ready
+  useEffect(() => {
+    if (project?.status !== "ready") return;
+    apiFetch<BranchListResponse>(`/api/projects/${id}/branches`).then((res) => {
+      if (res.success && res.data) {
+        setBranches(res.data.branches);
+        setCurrentBranch(res.data.current);
+        setSelectedBranch(res.data.current);
+      }
+    });
+  }, [project?.status, id]);
+
+  async function handleBranchSwitch() {
+    if (!selectedBranch || selectedBranch === currentBranch) return;
+    setSwitching(true);
+    setError(null);
+    const res = await apiFetch<Project>(`/api/projects/${id}/checkout`, {
+      method: "POST",
+      body: JSON.stringify({ branch: selectedBranch }),
+    });
+    if (res.success && res.data) {
+      setProject(res.data);
+      setCurrentBranch(selectedBranch);
+    } else {
+      setError(res.error ?? "Failed to switch branch");
+    }
+    setSwitching(false);
+  }
 
   async function handleClone() {
     setCloning(true);
@@ -146,12 +179,10 @@ export function ProjectDetailPage() {
               <div className="detail-label">Git URL</div>
               <div className="detail-value mono">{project.gitUrl ?? "Not set"}</div>
             </div>
-            {project.branch && (
-              <div className="detail-field">
-                <div className="detail-label">Branch</div>
-                <div className="detail-value mono">{project.branch}</div>
-              </div>
-            )}
+            <div className="detail-field">
+              <div className="detail-label">Branch</div>
+              <div className="detail-value mono">{currentBranch || project.branch || "—"}</div>
+            </div>
             <div className="detail-field">
               <div className="detail-label">Git Token</div>
               <div className="detail-value">
@@ -201,6 +232,31 @@ export function ProjectDetailPage() {
               )}
             </div>
           </div>
+
+          {project.status === "ready" && branches.length > 0 && (
+            <div className="project-detail-section">
+              <h3>Branch</h3>
+              <div className="branch-switcher">
+                <select
+                  className="branch-select"
+                  value={selectedBranch}
+                  onChange={(e) => setSelectedBranch(e.target.value)}
+                  disabled={switching}
+                >
+                  {branches.map((b) => (
+                    <option key={b} value={b}>{b}</option>
+                  ))}
+                </select>
+                <button
+                  className="btn btn-primary branch-switch-btn"
+                  onClick={handleBranchSwitch}
+                  disabled={switching || selectedBranch === currentBranch}
+                >
+                  {switching ? "Switching..." : "Switch Branch"}
+                </button>
+              </div>
+            </div>
+          )}
 
           <div className="project-detail-section">
             <h3>Update Git Token</h3>

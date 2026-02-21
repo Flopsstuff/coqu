@@ -13,6 +13,7 @@ import type {
   ApiToken,
   AuthResponse,
   AuthStatus,
+  BranchListResponse,
   CreateTokenResponse,
   HealthStatus,
   PingResponse,
@@ -508,10 +509,14 @@ function cloneProject(projectId: string, gitUrl: string, branch: string | null, 
       return;
     }
 
-    await prisma.project.update({
-      where: { id: projectId },
-      data: { status: "ready", path: projectDir, statusMessage: null },
-    }).catch(() => {});
+    // Detect actual branch after clone
+    execFile("git", ["rev-parse", "--abbrev-ref", "HEAD"], { cwd: projectDir }, async (branchErr, branchStdout) => {
+      const detectedBranch = branchErr ? null : branchStdout.trim();
+      await prisma.project.update({
+        where: { id: projectId },
+        data: { status: "ready", path: projectDir, statusMessage: null, branch: detectedBranch },
+      }).catch(() => {});
+    });
   });
 
   activeClones.set(projectId, child);
@@ -548,6 +553,86 @@ app.post("/api/projects/:id/clone", requireAuth, async (req, res) => {
 
   const response: ApiResponse<Project> = { success: true, data: toProject(updated) };
   res.status(202).json(response);
+});
+
+// --- Branch management ---
+
+app.get("/api/projects/:id/branches", requireAuth, async (req, res) => {
+  const project = await prisma.project.findUnique({ where: { id: req.params.id as string } });
+  if (!project) {
+    res.status(404).json({ success: false, error: "Project not found" } satisfies ApiResponse<never>);
+    return;
+  }
+  if (project.status !== "ready" || !project.path) {
+    res.status(400).json({ success: false, error: "Project is not ready" } satisfies ApiResponse<never>);
+    return;
+  }
+
+  execFile("git", ["branch", "-a"], { cwd: project.path }, (err, stdout) => {
+    if (err) {
+      res.status(500).json({ success: false, error: "Failed to list branches" } satisfies ApiResponse<never>);
+      return;
+    }
+
+    let current = "";
+    const branchSet = new Set<string>();
+
+    for (const line of stdout.split("\n")) {
+      const trimmed = line.trim();
+      if (!trimmed) continue;
+
+      if (trimmed.startsWith("* ")) {
+        current = trimmed.slice(2);
+        branchSet.add(current);
+      } else if (trimmed.startsWith("remotes/origin/")) {
+        const name = trimmed.replace("remotes/origin/", "");
+        if (name !== "HEAD" && !name.startsWith("HEAD ")) {
+          branchSet.add(name);
+        }
+      } else {
+        branchSet.add(trimmed);
+      }
+    }
+
+    const branches = [...branchSet].sort();
+    const response: ApiResponse<BranchListResponse> = {
+      success: true,
+      data: { current, branches },
+    };
+    res.json(response);
+  });
+});
+
+app.post("/api/projects/:id/checkout", requireAuth, async (req, res) => {
+  const project = await prisma.project.findUnique({ where: { id: req.params.id as string } });
+  if (!project) {
+    res.status(404).json({ success: false, error: "Project not found" } satisfies ApiResponse<never>);
+    return;
+  }
+  if (project.status !== "ready" || !project.path) {
+    res.status(400).json({ success: false, error: "Project is not ready" } satisfies ApiResponse<never>);
+    return;
+  }
+
+  const { branch } = req.body;
+  if (!branch || typeof branch !== "string" || branch.trim().length === 0) {
+    res.status(400).json({ success: false, error: "Branch name is required" } satisfies ApiResponse<never>);
+    return;
+  }
+
+  execFile("git", ["checkout", branch.trim()], { cwd: project.path }, async (err, _stdout, stderr) => {
+    if (err) {
+      res.status(400).json({ success: false, error: stderr || err.message } satisfies ApiResponse<never>);
+      return;
+    }
+
+    const updated = await prisma.project.update({
+      where: { id: project.id },
+      data: { branch: branch.trim() },
+    });
+    const response: ApiResponse<Project> = { success: true, data: toProject(updated) };
+    res.json(response);
+  });
 });
 
 // --- Graceful shutdown ---

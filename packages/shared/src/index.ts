@@ -103,3 +103,8 @@ export interface CreateProjectRequest {
   branch?: string;
   gitToken?: string;
 }
+
+export interface BranchListResponse {
+  current: string;
+  branches: string[];
+}
