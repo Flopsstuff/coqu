@@ -22,7 +22,6 @@ import type {
   CommitInfoResponse,
   CreateTokenResponse,
   HealthStatus,
-  LogCategory,
   LogDatesResponse,
   LogEntry,
   LogsResponse,
