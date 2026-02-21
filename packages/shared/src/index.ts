@@ -108,3 +108,8 @@ export interface BranchListResponse {
   current: string;
   branches: string[];
 }
+
+export interface CommitInfoResponse {
+  hash: string;
+  message: string;
+}

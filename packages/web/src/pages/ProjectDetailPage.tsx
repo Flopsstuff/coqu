@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import type { Project, ProjectStatus, BranchListResponse } from "@coqu/shared";
+import type { Project, ProjectStatus, BranchListResponse, CommitInfoResponse } from "@coqu/shared";
 import { Header } from "../Header";
 import { apiFetch } from "../api";
 
@@ -27,6 +27,8 @@ export function ProjectDetailPage() {
   const [selectedBranch, setSelectedBranch] = useState("");
   const [switching, setSwitching] = useState(false);
   const [pulling, setPulling] = useState(false);
+  const [commitHash, setCommitHash] = useState("");
+  const [commitMessage, setCommitMessage] = useState("");
 
   const loadProject = useCallback(async () => {
     const res = await apiFetch<Project>(`/api/projects/${id}`);
@@ -69,6 +71,21 @@ export function ProjectDetailPage() {
     });
   }, [project?.status, id]);
 
+  // Load commit info when project is ready
+  const loadCommitInfo = useCallback(() => {
+    if (project?.status !== "ready") return;
+    apiFetch<CommitInfoResponse>(`/api/projects/${id}/commit`).then((res) => {
+      if (res.success && res.data) {
+        setCommitHash(res.data.hash);
+        setCommitMessage(res.data.message);
+      }
+    });
+  }, [project?.status, id]);
+
+  useEffect(() => {
+    loadCommitInfo();
+  }, [loadCommitInfo]);
+
   async function handleBranchSwitch() {
     if (!selectedBranch || selectedBranch === currentBranch) return;
     setSwitching(true);
@@ -80,6 +97,7 @@ export function ProjectDetailPage() {
     if (res.success && res.data) {
       setProject(res.data);
       setCurrentBranch(selectedBranch);
+      loadCommitInfo();
     } else {
       setError(res.error ?? "Failed to switch branch");
     }
@@ -92,6 +110,7 @@ export function ProjectDetailPage() {
     const res = await apiFetch<Project>(`/api/projects/${id}/pull`, { method: "POST" });
     if (res.success && res.data) {
       setProject(res.data);
+      loadCommitInfo();
     } else {
       setError(res.error ?? "Failed to pull");
     }
@@ -196,6 +215,18 @@ export function ProjectDetailPage() {
               <div className="detail-label">Branch</div>
               <div className="detail-value mono">{currentBranch || project.branch || "—"}</div>
             </div>
+            {commitHash && (
+              <div className="detail-field">
+                <div className="detail-label">Commit</div>
+                <div className="detail-value mono">{commitHash.slice(0, 7)}</div>
+              </div>
+            )}
+            {commitMessage && (
+              <div className="detail-field">
+                <div className="detail-label">Commit Message</div>
+                <div className="detail-value">{commitMessage}</div>
+              </div>
+            )}
             <div className="detail-field">
               <div className="detail-label">Git Token</div>
               <div className="detail-value">

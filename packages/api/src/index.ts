@@ -14,6 +14,7 @@ import type {
   AuthResponse,
   AuthStatus,
   BranchListResponse,
+  CommitInfoResponse,
   CreateTokenResponse,
   HealthStatus,
   PingResponse,
@@ -631,6 +632,31 @@ app.post("/api/projects/:id/checkout", requireAuth, async (req, res) => {
       data: { branch: branch.trim() },
     });
     const response: ApiResponse<Project> = { success: true, data: toProject(updated) };
+    res.json(response);
+  });
+});
+
+app.get("/api/projects/:id/commit", requireAuth, async (req, res) => {
+  const project = await prisma.project.findUnique({ where: { id: req.params.id as string } });
+  if (!project) {
+    res.status(404).json({ success: false, error: "Project not found" } satisfies ApiResponse<never>);
+    return;
+  }
+  if (project.status !== "ready" || !project.path) {
+    res.status(400).json({ success: false, error: "Project is not ready" } satisfies ApiResponse<never>);
+    return;
+  }
+
+  execFile("git", ["log", "-1", "--format=%H%n%s"], { cwd: project.path }, (err, stdout) => {
+    if (err) {
+      res.status(500).json({ success: false, error: "Failed to get commit info" } satisfies ApiResponse<never>);
+      return;
+    }
+    const lines = stdout.trim().split("\n");
+    const response: ApiResponse<CommitInfoResponse> = {
+      success: true,
+      data: { hash: lines[0], message: lines.slice(1).join("\n") },
+    };
     res.json(response);
   });
 });
